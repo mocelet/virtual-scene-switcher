@@ -1,0 +1,7 @@
+name: 'Virtual Scene Switcher'
+packageKey: 'virtual-scene-switcher'
+permissions:
+    lan: {}
+    discovery: {}
+description: "A virtual device that simplifies cycling through scenes, especially useful with smart buttons. Read the post at SmartThings community for more info!"
+vendorSupportInformation: "https://community.smartthings.com"

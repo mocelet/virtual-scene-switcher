@@ -1,0 +1,14 @@
+{
+    "id": "panelorange55982.createSwitcher",
+    "version": 1,
+    "status": "proposed",
+    "name": "Create Switcher",
+    "ephemeral": false,
+    "attributes": {},
+    "commands": {
+        "create": {
+            "name": "create",
+            "arguments": []
+        }
+    }
+}

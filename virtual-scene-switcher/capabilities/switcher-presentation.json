@@ -1,0 +1,293 @@
+{
+    "dashboard": {
+        "states": [
+            {
+                "label": "{{scene.value}}"
+            }
+        ],
+        "actions": []
+    },
+    "detailView": [
+        {
+            "label": "Active scene",
+            "displayType": "state",
+            "state": {
+                "label": "{{scene.value}}"
+            }
+        }
+    ],
+    "automation": {
+        "conditions": [
+            {
+                "label": "Active scene",
+                "displayType": "numberField",
+                "numberField": {
+                    "value": "scene.value",
+                    "valueType": "integer" 
+                }
+            }
+        ],
+        "actions": [
+            {
+                "label": "Activate scene",
+                "displayType": "list",
+                "list": {
+                    "command": "activateScene",
+                    "alternatives": [
+                        {
+                            "key": "next",
+                            "value": "Next ( > )"
+                        },
+                        {
+                            "key": "previous",
+                            "value": "Previous ( < )"
+                        },
+                        {
+                            "key": "recall",
+                            "value": "Recall current / pre-set"
+                        },
+                        {
+                            "key": "first",
+                            "value": "Initial ( << )"
+                        },
+                        {
+                            "key": "last",
+                            "value": "Final ( >> )"
+                        },
+                        {
+                            "key": "1",
+                            "value": "Scene 1"
+                        },
+                        {
+                            "key": "2",
+                            "value": "Scene 2"
+                        },
+                        {
+                            "key": "3",
+                            "value": "Scene 3"
+                        },
+                        {
+                            "key": "4",
+                            "value": "Scene 4"
+                        },
+                        {
+                            "key": "5",
+                            "value": "Scene 5"
+                        },
+                        {
+                            "key": "6",
+                            "value": "Scene 6"
+                        },
+                        {
+                            "key": "7",
+                            "value": "Scene 7"
+                        },
+                        {
+                            "key": "8",
+                            "value": "Scene 8"
+                        },
+                        {
+                            "key": "9",
+                            "value": "Scene 9"
+                        },
+                        {
+                            "key": "10",
+                            "value": "Scene 10"
+                        },
+                        {
+                            "key": "11",
+                            "value": "Scene 11"
+                        },
+                        {
+                            "key": "12",
+                            "value": "Scene 12"
+                        },
+                        {
+                            "key": "13",
+                            "value": "Scene 13"
+                        },
+                        {
+                            "key": "14",
+                            "value": "Scene 14"
+                        },
+                        {
+                            "key": "15",
+                            "value": "Scene 15"
+                        },
+                        {
+                            "key": "16",
+                            "value": "Scene 16"
+                        },
+                        {
+                            "key": "17",
+                            "value": "Scene 17"
+                        },
+                        {
+                            "key": "18",
+                            "value": "Scene 18"
+                        },
+                        {
+                            "key": "19",
+                            "value": "Scene 19"
+                        },
+                        {
+                            "key": "20",
+                            "value": "Scene 20"
+                        },
+                        {
+                            "key": "21",
+                            "value": "Scene 21"
+                        },
+                        {
+                            "key": "22",
+                            "value": "Scene 22"
+                        },
+                        {
+                            "key": "23",
+                            "value": "Scene 23"
+                        },
+                        {
+                            "key": "24",
+                            "value": "Scene 24"
+                        },
+                        {
+                            "key": "25",
+                            "value": "Scene 25"
+                        }
+                    ]
+                }
+            },
+            {
+                "label": "Pre-set without activation",
+                "displayType": "list",
+                "list": {
+                    "command": "presetScene",
+                    "alternatives": [
+                        {
+                            "key": "reset",
+                            "value": "Reapply last pre-set"
+                        },
+                        {
+                            "key": "next",
+                            "value": "Next ( > )"
+                        },
+                        {
+                            "key": "previous",
+                            "value": "Previous ( < )"
+                        },
+                        {
+                            "key": "first",
+                            "value": "Initial ( << )"
+                        },
+                        {
+                            "key": "last",
+                            "value": "Final ( >> )"
+                        },
+                        {
+                            "key": "1",
+                            "value": "Scene 1"
+                        },
+                        {
+                            "key": "2",
+                            "value": "Scene 2"
+                        },
+                        {
+                            "key": "3",
+                            "value": "Scene 3"
+                        },
+                        {
+                            "key": "4",
+                            "value": "Scene 4"
+                        },
+                        {
+                            "key": "5",
+                            "value": "Scene 5"
+                        },
+                        {
+                            "key": "6",
+                            "value": "Scene 6"
+                        },
+                        {
+                            "key": "7",
+                            "value": "Scene 7"
+                        },
+                        {
+                            "key": "8",
+                            "value": "Scene 8"
+                        },
+                        {
+                            "key": "9",
+                            "value": "Scene 9"
+                        },
+                        {
+                            "key": "10",
+                            "value": "Scene 10"
+                        },
+                        {
+                            "key": "11",
+                            "value": "Scene 11"
+                        },
+                        {
+                            "key": "12",
+                            "value": "Scene 12"
+                        },
+                        {
+                            "key": "13",
+                            "value": "Scene 13"
+                        },
+                        {
+                            "key": "14",
+                            "value": "Scene 14"
+                        },
+                        {
+                            "key": "15",
+                            "value": "Scene 15"
+                        },
+                        {
+                            "key": "16",
+                            "value": "Scene 16"
+                        },
+                        {
+                            "key": "17",
+                            "value": "Scene 17"
+                        },
+                        {
+                            "key": "18",
+                            "value": "Scene 18"
+                        },
+                        {
+                            "key": "19",
+                            "value": "Scene 19"
+                        },
+                        {
+                            "key": "20",
+                            "value": "Scene 20"
+                        },
+                        {
+                            "key": "21",
+                            "value": "Scene 21"
+                        },
+                        {
+                            "key": "22",
+                            "value": "Scene 22"
+                        },
+                        {
+                            "key": "23",
+                            "value": "Scene 23"
+                        },
+                        {
+                            "key": "24",
+                            "value": "Scene 24"
+                        },
+                        {
+                            "key": "25",
+                            "value": "Scene 25"
+                        }
+                    ]
+                }
+            }
+        ]
+    },
+    "id": "panelorange55982.activeScene",
+    "version": 1
+}

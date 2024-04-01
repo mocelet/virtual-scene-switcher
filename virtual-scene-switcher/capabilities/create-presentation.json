@@ -1,0 +1,13 @@
+{
+    "detailView": [
+        {
+            "label": "Create another scene switcher",
+            "displayType": "pushButton",
+            "pushButton": {
+                "command": "create"
+            }
+        }
+    ],
+    "id": "panelorange55982.createSwitcher",
+    "version": 1
+}

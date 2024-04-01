@@ -1,0 +1,42 @@
+name: scene-switcher
+components:
+  - id: main
+    capabilities:
+      - id: panelorange55982.activeScene
+        version: 1
+      - id: panelorange55982.createSwitcher
+        version: 1
+      - id: refresh
+        version: 1
+    categories:
+      - name: Others
+metadata:
+  ocfDeviceType: oic.wk.d
+preferences:
+  - name: "intro"
+    title: "Virtual Scene Switcher"
+    description: "Facilitates cycling through scenes with smart buttons as well as having pre-set scenes for different times of the day. Select the number of scenes to cycle through and the operation mode. The rest is done via routines. Check the post at SmartThings Community for use cases!"
+    required: true
+    preferenceType: string
+    definition:
+      stringType: text
+      minLength: 0
+      maxLength: 0
+      default: ""
+  - title: "Number of scenes in use"
+    name: scenesCount
+    required: true
+    preferenceType: number
+    definition:
+      minimum: 1
+      default: 4
+      maximum: 1000
+  - title: "Cycle mode"
+    name: cycleMode
+    required: true
+    preferenceType: enumeration 
+    definition:
+      options:
+        "circular": "Circular. Loops through scenes"
+        "linear": "Linear. Will not loop"
+      default: "circular"
