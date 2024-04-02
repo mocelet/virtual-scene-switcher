@@ -31,11 +31,14 @@
               "schema": {
                 "type": "string",
                 "enum": [
+                  "recall",
                   "next",
                   "previous",
-                  "recall",
                   "first",
                   "last",
+                  "autoForwards",
+                  "autoBackwards",
+                  "autoStop",
                   "1",
                   "2",
                   "3",

@@ -14,7 +14,7 @@ metadata:
   ocfDeviceType: oic.wk.d
 preferences:
   - name: "intro"
-    title: "Virtual Scene Switcher"
+    title: "VIRTUAL Scene Switcher"
     description: "Facilitates cycling through scenes with smart buttons as well as having pre-set scenes for different times of the day. Select the number of scenes to cycle through and the operation mode. The rest is done via routines. Check the post at SmartThings Community for use cases!"
     required: true
     preferenceType: string
@@ -40,3 +40,36 @@ preferences:
         "circular": "Circular. Loops through scenes"
         "linear": "Linear. Will not loop"
       default: "circular"
+  - name: "introAutocycle"
+    title: "AUTO-CYCLE tweaks"
+    description: "When using auto-cycle do not forget to stop it. Any command will stop it, not just Stop, and you can configure whether the same starting action will also stop it. Otherwise, it will stop itself after completing a whole loop or, in linear mode, reaching the end."
+    required: true
+    preferenceType: string
+    definition:
+      stringType: text
+      minLength: 0
+      maxLength: 0
+      default: ""
+  - title: "Auto-cycle delay (def: 1000 ms)"
+    name: autocycleDelay
+    required: true
+    preferenceType: number
+    definition:
+      minimum: 500
+      default: 1000
+      maximum: 1800000
+  - title: "Circular behaviour if not stopped"
+    name: autostopBehaviour
+    required: true
+    preferenceType: enumeration 
+    definition:
+      options:
+        "starting": "Ends in starting scene"
+        "plusone": "Ends in prev/next scene"
+      default: "starting"
+  - title: "Start action also stops"
+    name: autocycleStartStops
+    required: true
+    preferenceType: boolean
+    definition:
+      default: false   

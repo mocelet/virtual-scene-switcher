@@ -13,8 +13,8 @@
 
 --[[ mocelet 2024
 
-  Helper to facilitate cycling through scenes in SmartThings, useful to complement smart
-  buttons with auto-repeat features. 
+  Helper to facilitate cycling through scenes in SmartThings, featuring 
+  both manual and auto-cycling with customizable delay time.
     
   Also allows to set scenes in advance without activating them and recall them later, 
   typical use case being pre-setting different scenes at different moments of the day 
@@ -39,6 +39,9 @@ local log = require "log"
 local active_scene = capabilities["panelorange55982.activeScene"]
 local create_switcher = capabilities["panelorange55982.createSwitcher"]
 
+local autocycle = {}
+local AUTOCYCLE_TIMER = "autocycle.timer"
+
 local created = false
 
 local Actions = {
@@ -47,12 +50,20 @@ local Actions = {
   RECALL = "recall",
   FIRST = "first",
   LAST = "last",
-  RESET = "reset"
+  RESET = "reset",
+  AUTOCYCLE_FORWARDS = "autoForwards",
+  AUTOCYCLE_BACKWARDS = "autoBackwards",
+  AUTOCYCLE_STOP = "autoStop"
 }
 
 local CycleModes = {
   CIRCULAR = "circular",
   LINEAR = "linear"
+}
+
+local AutostopBehaviour = {
+  STARTING = "starting",
+  PLUS_ONE = "plusone"
 }
 
 local function current_scene(device)
@@ -65,6 +76,16 @@ end
 
 local function scenes_count(device)
   return device.preferences.scenesCount or DEFAULT_SCENES_COUNT
+end
+
+local function autostop_behaviour(device)
+  return device.preferences.autostopBehaviour == AutostopBehaviour.PLUS_ONE and AutostopBehaviour.PLUS_ONE or AutostopBehaviour.STARTING
+end
+
+local function reached_end(device, step)
+  local next = current_scene(device) + step
+  local max = scenes_count(device)
+  return cycle_mode(device) == CycleModes.LINEAR and (next < 1 or next > max)
 end
 
 local function scene_in_range(device, scene_number)
@@ -103,6 +124,9 @@ local function switch_to_scene(device, scene_number, activate)
 end
 
 local function handle_scene_change(device, cmd, activate)
+  local autocycle_was_running = autocycle.running(device)
+  autocycle.stop(device) -- Always stop autocycle when receiving any scene command
+
   local action = cmd.args.scene
   if action == Actions.NEXT or action == Actions.PREV then
     local step = action == Actions.NEXT and 1 or -1
@@ -116,6 +140,15 @@ local function handle_scene_change(device, cmd, activate)
   elseif action == Actions.RESET then
     local preset = device:get_field(PRESET_SCENE_PERSISTENT_FIELD) or current_scene(device)
     device:set_field(CURRENT_SCENE_FIELD, preset)
+  elseif action == Actions.AUTOCYCLE_FORWARDS or action == Actions.AUTOCYCLE_BACKWARDS then
+    if autocycle_was_running and device.preferences.autocycleStartStops then
+      return -- not starting the auto-cycle
+    end
+    local delay = device.preferences.autocycleDelay and device.preferences.autocycleDelay / 1000 or 1
+    local step = action == Actions.AUTOCYCLE_FORWARDS and 1 or -1 
+    autocycle.start(device, delay, step)
+  elseif action == Actions.AUTOCYCLE_STOP then
+    autocycle.stop(device)
   else
     local scene_number = math.tointeger(action)
     if scene_number then
@@ -132,6 +165,51 @@ end
 -- Changes current scene but does not activate it
 local function handle_preset_scene(driver, device, cmd)
 	handle_scene_change(device, cmd, false)
+end
+
+-- AUTO-CYCLE FEATURE
+
+autocycle.callback = function(device, delay_seconds, step, switch_count)
+  return function()
+    switch_to_scene(device, current_scene(device) + step, true)
+
+    -- Stop conditions
+    local autostop_offset = autostop_behaviour(device) == AutostopBehaviour.PLUS_ONE and 1 or 0
+    local max_switches_count = scenes_count(device) + autostop_offset
+    if reached_end(device, step) then
+      log.debug("[Auto-cycle] Stopping. Reached end after cycling through " .. switch_count .. " scenes")
+      autocycle.stop(device)
+      return
+    elseif switch_count >= max_switches_count then
+      log.debug("[Auto-cycle] Stopping. Completed loop through " .. switch_count .. " scenes")
+      autocycle.stop(device)
+      return
+    end
+
+    -- Prepare next switch
+    local timer = device.thread:call_with_delay(delay_seconds, autocycle.callback(device, delay_seconds, step, switch_count + 1))  
+    device:set_field(AUTOCYCLE_TIMER, timer) 
+  end
+end
+
+autocycle.start = function(device, delay_seconds, step)
+  autocycle.stop(device)
+  log.debug("[Auto-cycle] Started with delay " .. delay_seconds)
+  local first_step = autocycle.callback(device, delay_seconds, step, 1)
+  first_step()
+end
+
+autocycle.stop = function(device)
+  local timer = device:get_field(AUTOCYCLE_TIMER)
+  if timer then
+    log.debug("[Auto-cycle] Stopped")
+    device.thread:cancel_timer(timer)
+    device:set_field(AUTOCYCLE_TIMER, nil)
+  end
+end
+
+autocycle.running = function(device)
+  return device:get_field(AUTOCYCLE_TIMER)
 end
 
 -- VIRTUAL DEVICE CREATION AND LIFECYCLE HANDLING

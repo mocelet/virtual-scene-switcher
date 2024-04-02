@@ -35,6 +35,10 @@
                     "command": "activateScene",
                     "alternatives": [
                         {
+                            "key": "recall",
+                            "value": "Recall current / pre-set"
+                        },
+                        {
                             "key": "next",
                             "value": "Next ( > )"
                         },
@@ -42,10 +46,7 @@
                             "key": "previous",
                             "value": "Previous ( < )"
                         },
-                        {
-                            "key": "recall",
-                            "value": "Recall current / pre-set"
-                        },
+                    
                         {
                             "key": "first",
                             "value": "Initial ( << )"
@@ -53,6 +54,18 @@
                         {
                             "key": "last",
                             "value": "Final ( >> )"
+                        },
+                        {
+                            "key": "autoForwards",
+                            "value": "Auto-cycle forwards"
+                        },
+                        {
+                            "key": "autoBackwards",
+                            "value": "Auto-cycle backwards"
+                        },
+                        {
+                            "key": "autoStop",
+                            "value": "Stop auto-cycle"
                         },
                         {
                             "key": "1",
