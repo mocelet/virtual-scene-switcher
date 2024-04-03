@@ -15,7 +15,7 @@ metadata:
 preferences:
   - name: "intro"
     title: "VIRTUAL Scene Switcher"
-    description: "Facilitates cycling through scenes with smart buttons as well as having pre-set scenes for different times of the day. Select the number of scenes to cycle through and the operation mode. The rest is done via routines. Check the post at SmartThings Community for use cases!"
+    description: "Facilitates cycling through scenes with smart buttons. Just set the number of scenes, create routines to map each Switcher scene to your actions and assign buttons to Switcher actions like next or previous."
     required: true
     preferenceType: string
     definition:
@@ -23,10 +23,10 @@ preferences:
       minLength: 0
       maxLength: 0
       default: ""
-  - title: "Number of scenes in use"
+  - title: "Number of scenes to cycle"
     name: scenesCount
     required: true
-    preferenceType: number
+    preferenceType: integer
     definition:
       minimum: 1
       default: 4
@@ -39,7 +39,15 @@ preferences:
       options:
         "circular": "Circular. Loops through scenes"
         "linear": "Linear. Will not loop"
-      default: "circular"
+      default: "circular"    
+  - title: "Default scene"
+    name: defaultScene
+    required: true
+    preferenceType: integer
+    definition:
+      minimum: 1
+      default: 1
+      maximum: 1000      
   - name: "introAutocycle"
     title: "AUTO-CYCLE tweaks"
     description: "When using auto-cycle do not forget to stop it. Any command will stop it, not just Stop, and you can configure whether the same starting action will also stop it. Otherwise, it will stop itself after completing a whole loop or, in linear mode, reaching the end."
@@ -50,7 +58,24 @@ preferences:
       minLength: 0
       maxLength: 0
       default: ""
-  - title: "Auto-cycle delay (def: 1000 ms)"
+  - title: "Use same action for start / stop"
+    name: autocycleStartStops
+    required: true
+    preferenceType: boolean
+    definition:
+      default: false         
+  - title: "Starting scene (def: next / prev)"
+    name: autocycleStartingScene
+    required: true
+    preferenceType: enumeration 
+    definition:
+      options:
+        "nextprev": "Next / Previous scene"
+        "current": "Current scene (reactivate)"
+        "initial": "Initial scene"
+        "final": "Final scene"
+      default: "nextprev"
+  - title: "Switching delay (def: 1000 ms)"
     name: autocycleDelay
     required: true
     preferenceType: number
@@ -65,11 +90,29 @@ preferences:
     definition:
       options:
         "starting": "Ends in starting scene"
-        "plusone": "Ends in prev/next scene"
+        "minusone": "Ends right before starting scene"
       default: "starting"
-  - title: "Start action also stops"
-    name: autocycleStartStops
+  - title: "Circular max loops (def: 1)"
+    name: autocycleMaxLoops
+    required: true
+    preferenceType: integer
+    definition:
+      minimum: 1
+      default: 1
+      maximum: 100
+  - name: "introPreset"
+    title: "PRESET / RECALL mode"
+    description: "Changes behaviour to allow scheduling a preset scene (Scene N actions) without activating it until it is recalled (Reactivate action). Reactivate will not reactivate the current scene but the current preset. Mind that presets do not survive driver restarts, default scene will reactivate instead."
+    required: true
+    preferenceType: string
+    definition:
+      stringType: text
+      minLength: 0
+      maxLength: 0
+      default: ""
+  - title: "Enable Scene N preset / recall"
+    name: presetRecallEnabled
     required: true
     preferenceType: boolean
     definition:
-      default: false   
+      default: false

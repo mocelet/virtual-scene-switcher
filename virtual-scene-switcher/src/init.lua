@@ -1,4 +1,4 @@
-
+-- 
 -- Licensed under the Apache License, Version 2.0 (the "License");
 -- you may not use this file except in compliance with the License.
 -- You may obtain a copy of the License at
@@ -14,23 +14,29 @@
 --[[ mocelet 2024
 
   Helper to facilitate cycling through scenes in SmartThings, featuring 
-  both manual and auto-cycling with customizable delay time.
-    
-  Also allows to set scenes in advance without activating them and recall them later, 
-  typical use case being pre-setting different scenes at different moments of the day 
-  so when the light turns on it turns on at the pre-set scene without complex 
-  time-checking routines.
+  both manual and auto-cycling with customizable delay time, modes and
+  other behaviours.
 
+  Originally it featured presetting/recalling scenes using persistent storage
+  but it has been removed. According to the official documentation, persistent 
+  storage should be almost avoided because "carries with it a cost in wear [of 
+  the hub], as well as time delays associated with the writing and reading".
+  
+  Preset feature is now implemented using transient fields, meaning it will
+  not survive restarts. However, there is a setting to specify the default scene used
+  in that case and minimize the inconvenience.
+    
   Capabilities and presentations have to be created with the command line, e.g.:
    smartthings capabilities:create -i switcher-capability.json
    smartthings capabilities:presentation:create -i switcher-presentation.json
 ]]
 
-local LABEL = "Scene Switcher"
+local DEFAULT_NAME = "Scene Switcher"
+local MODEL = "Virtual Scene Switcher"
 local PROFILE = "scene-switcher"
 local DEFAULT_SCENES_COUNT = 4
 local CURRENT_SCENE_FIELD = "scene.current"
-local PRESET_SCENE_PERSISTENT_FIELD = "scene.preset"
+local PRESET_SCENE_FIELD = "scene.memory"
 local capabilities = require "st.capabilities"
 local Driver = require "st.driver"
 local lua_socket = require "socket"
@@ -43,16 +49,21 @@ local autocycle = {}
 local AUTOCYCLE_TIMER = "autocycle.timer"
 
 local created = false
+local random_seeded = false
 
 local Actions = {
   NEXT = "next",
   PREV = "previous",
-  RECALL = "recall",
+  SKIP_NEXT = "next2",
+  SKIP_PREV = "previous2",
+  REACTIVATE = "reactivate",
   FIRST = "first",
   LAST = "last",
-  RESET = "reset",
+  DEFAULT = "default",
+  SURPRISE_ME = "surpriseme",
   AUTOCYCLE_FORWARDS = "autoForwards",
   AUTOCYCLE_BACKWARDS = "autoBackwards",
+  AUTOCYCLE_RANDOM = "autoRandom",
   AUTOCYCLE_STOP = "autoStop"
 }
 
@@ -61,31 +72,85 @@ local CycleModes = {
   LINEAR = "linear"
 }
 
+local AutocycleStartingScene = {
+  NEXT_PREV = "nextprev",
+  CURRENT = "current",
+  INITIAL = "initial",
+  FINAL = "final"
+}
+
 local AutostopBehaviour = {
   STARTING = "starting",
-  PLUS_ONE = "plusone"
+  MINUS_ONE = "minusone"
 }
+
+local function random_seed_once()
+  if not random_seeded then
+    log.debug("Random generator seeded")
+    random_seeded = true
+    math.randomseed(os.time())
+    math.random()
+  end
+end
 
 local function current_scene(device)
   return device:get_field(CURRENT_SCENE_FIELD) or 1
 end
 
+local function preset_scene(device)
+  return device:get_field(PRESET_SCENE_FIELD) or current_scene(device)
+end
+
+local function default_scene(device)
+  return math.tointeger(device.preferences.defaultScene or 1)
+end
+
 local function cycle_mode(device)
-  return device.preferences.cycleMode == CycleModes.LINEAR and CycleModes.LINEAR or CycleModes.CIRCULAR
+  local cycle_mode_pref = device.preferences.cycleMode
+  if not cycle_mode_pref then
+    return CycleModes.CIRCULAR
+  end
+  return cycle_mode_pref
 end
 
 local function scenes_count(device)
   return device.preferences.scenesCount or DEFAULT_SCENES_COUNT
 end
 
+-- Returns a random scene different than the current one
+local function random_scene(device)
+  random_seed_once()
+  local scene_count = scenes_count(device)
+  local current_scene = current_scene(device)
+  local random_scene = current_scene
+  while scene_count > 1 and random_scene == current_scene do
+    random_scene = math.random(1, scene_count)
+  end
+  return random_scene
+end
+
 local function autostop_behaviour(device)
-  return device.preferences.autostopBehaviour == AutostopBehaviour.PLUS_ONE and AutostopBehaviour.PLUS_ONE or AutostopBehaviour.STARTING
+  return device.preferences.autostopBehaviour == AutostopBehaviour.MINUS_ONE and AutostopBehaviour.MINUS_ONE or AutostopBehaviour.STARTING
+end
+
+local function max_autocycle_switches(device)
+  local max_loops = device.preferences.autocycleMaxLoops or 1
+  local max_switches = max_loops * scenes_count(device)
+  local autostop_offset = autostop_behaviour(device) == AutostopBehaviour.MINUS_ONE and 0 or 1
+  return max_switches + autostop_offset 
+end
+
+local function preset_mode_enabled(device)
+  return device.preferences.presetRecallEnabled
 end
 
 local function reached_end(device, step)
+  if cycle_mode(device) == CycleModes.CIRCULAR then
+    return false
+  end
   local next = current_scene(device) + step
   local max = scenes_count(device)
-  return cycle_mode(device) == CycleModes.LINEAR and (next < 1 or next > max)
+  return next < 1 or next > max
 end
 
 local function scene_in_range(device, scene_number)
@@ -100,102 +165,109 @@ local function scene_in_range(device, scene_number)
   return math.tointeger(result)
 end
 
-local function default_scene(device)
-  local default_scene = device:get_field(PRESET_SCENE_PERSISTENT_FIELD) or 1
-  return scene_in_range(device, default_scene)
-end
-
--- Emits the given scene activation
 local function activate_scene(device, scene_number)
   local target_scene = scene_in_range(device, scene_number)
+  device:set_field(CURRENT_SCENE_FIELD, target_scene)
   device:emit_component_event(device.profile.components.main, active_scene.scene({value = target_scene}, {state_change = true}))
 end
 
-local function switch_to_scene(device, scene_number, activate) 
-  local target_scene = scene_in_range(device, scene_number)
-  device:set_field(CURRENT_SCENE_FIELD, target_scene)
-  if activate then
-    activate_scene(device, target_scene)
-  else
-    -- It is a pre-set scene, store it persistently to survive driver restarts
-    -- and restore it when it is initialized
-    device:set_field(PRESET_SCENE_PERSISTENT_FIELD, target_scene, { persist = true })
-  end
-end
-
-local function handle_scene_change(device, cmd, activate)
+local function handle_activate_scene(driver, device, cmd)
   local autocycle_was_running = autocycle.running(device)
-  autocycle.stop(device) -- Always stop autocycle when receiving any scene command
+  autocycle.stop(device) -- Stopping autocycle with any action is convenient
 
   local action = cmd.args.scene
   if action == Actions.NEXT or action == Actions.PREV then
     local step = action == Actions.NEXT and 1 or -1
-    switch_to_scene(device, current_scene(device) + step, activate)
+    activate_scene(device, current_scene(device) + step)
+  elseif action == Actions.SKIP_NEXT or action == Actions.SKIP_PREV then
+    local step = action == Actions.SKIP_NEXT and 2 or -2
+    activate_scene(device, current_scene(device) + step)    
   elseif action == Actions.FIRST then
-    switch_to_scene(device, 1, activate)
+    activate_scene(device, 1)
   elseif action == Actions.LAST then
-    switch_to_scene(device, scenes_count(device), activate)
-  elseif action == Actions.RECALL then
-    activate_scene(device, current_scene(device))
-  elseif action == Actions.RESET then
-    local preset = device:get_field(PRESET_SCENE_PERSISTENT_FIELD) or current_scene(device)
-    device:set_field(CURRENT_SCENE_FIELD, preset)
-  elseif action == Actions.AUTOCYCLE_FORWARDS or action == Actions.AUTOCYCLE_BACKWARDS then
+    activate_scene(device, scenes_count(device))
+  elseif action == Actions.DEFAULT then
+    activate_scene(device, default_scene(device))
+  elseif action == Actions.SURPRISE_ME then
+    activate_scene(device, random_scene(device))
+  elseif action == Actions.REACTIVATE then
+    local preset_mode = preset_mode_enabled(device)
+    local target_scene = preset_mode and preset_scene(device) or current_scene(device)
+    activate_scene(device, target_scene)
+  elseif action == Actions.AUTOCYCLE_FORWARDS or action == Actions.AUTOCYCLE_BACKWARDS or action == Actions.AUTOCYCLE_RANDOM then
     if autocycle_was_running and device.preferences.autocycleStartStops then
       return -- not starting the auto-cycle
     end
+    local random = action == Actions.AUTOCYCLE_RANDOM
     local delay = device.preferences.autocycleDelay and device.preferences.autocycleDelay / 1000 or 1
-    local step = action == Actions.AUTOCYCLE_FORWARDS and 1 or -1 
+    local step = random and 0 or (action == Actions.AUTOCYCLE_FORWARDS and 1 or -1)
     autocycle.start(device, delay, step)
   elseif action == Actions.AUTOCYCLE_STOP then
     autocycle.stop(device)
-  else
+  else -- Actions "1", "2"...
     local scene_number = math.tointeger(action)
-    if scene_number then
-      switch_to_scene(device, scene_number, activate)
+    local preset_mode = preset_mode_enabled(device)
+    if scene_number and preset_mode then
+      device:set_field(PRESET_SCENE_FIELD, scene_number) 
+    elseif scene_number and not preset_mode then
+      activate_scene(device, scene_number)
     end
   end
 end
 
--- Changes current scene and also activates it
-local function handle_activate_scene(driver, device, cmd)
-	handle_scene_change(device, cmd, true)
-end
-
--- Changes current scene but does not activate it
-local function handle_preset_scene(driver, device, cmd)
-	handle_scene_change(device, cmd, false)
-end
-
 -- AUTO-CYCLE FEATURE
 
-autocycle.callback = function(device, delay_seconds, step, switch_count)
-  return function()
-    switch_to_scene(device, current_scene(device) + step, true)
+local function autocycle_starting_scene(device, step)
+  local starting_pref = device.preferences.autocycleStartingScene
+  if starting_pref == AutocycleStartingScene.INITIAL then
+    return 1
+  elseif starting_pref == AutocycleStartingScene.FINAL then
+    return scenes_count(device)
+  elseif starting_pref == AutocycleStartingScene.CURRENT then
+    return current_scene(device)
+  else
+    return current_scene(device) + step
+  end
+end
 
+autocycle.callback = function(device, delay_seconds, step, switch_count, scene)
+  return function()
+    activate_scene(device, scene, true)
+    local updated_switch_count = switch_count + 1
+    local target_scene = step == 0 and random_scene(device) or current_scene(device) + step
+    
     -- Stop conditions
-    local autostop_offset = autostop_behaviour(device) == AutostopBehaviour.PLUS_ONE and 1 or 0
-    local max_switches_count = scenes_count(device) + autostop_offset
     if reached_end(device, step) then
-      log.debug("[Auto-cycle] Stopping. Reached end after cycling through " .. switch_count .. " scenes")
+      log.debug("[Auto-cycle] Stopping. Reached end after cycling through " .. updated_switch_count .. " scenes")
       autocycle.stop(device)
       return
-    elseif switch_count >= max_switches_count then
-      log.debug("[Auto-cycle] Stopping. Completed loop through " .. switch_count .. " scenes")
+    elseif updated_switch_count >= max_autocycle_switches(device) then
+      log.debug("[Auto-cycle] Stopping. Completed loop through " .. updated_switch_count .. " scenes")
       autocycle.stop(device)
       return
     end
 
     -- Prepare next switch
-    local timer = device.thread:call_with_delay(delay_seconds, autocycle.callback(device, delay_seconds, step, switch_count + 1))  
+    local timer = device.thread:call_with_delay(delay_seconds, autocycle.callback(device, delay_seconds, step, updated_switch_count, target_scene))  
     device:set_field(AUTOCYCLE_TIMER, timer) 
   end
 end
 
 autocycle.start = function(device, delay_seconds, step)
   autocycle.stop(device)
-  log.debug("[Auto-cycle] Started with delay " .. delay_seconds)
-  local first_step = autocycle.callback(device, delay_seconds, step, 1)
+ 
+  local message
+  local starting_scene
+  if step == 0 then
+    message = "[Auto-cycle] Started random cycling"
+    starting_scene = random_scene(device)
+  else
+    message = "[Auto-cycle] Started sequential cycling"
+    starting_scene = autocycle_starting_scene(device, step)
+  end
+  log.debug(string.format("%s from scene %d. Step: %d. Delay: %d s", message, starting_scene, step, delay_seconds))
+
+  local first_step = autocycle.callback(device, delay_seconds, step, 0, starting_scene)
   first_step()
 end
 
@@ -214,26 +286,43 @@ end
 
 -- VIRTUAL DEVICE CREATION AND LIFECYCLE HANDLING
 
-local function create_device(driver)
+local function random_id(length)
+  random_seed_once()
+  local id = ""
+  for i = 1, length do
+    id = id .. string.format('%x', math.random(0, 0xf))    
+  end
+  return id
+end
+
+local function create_device(driver, device_name)
   local create_device_msg = {
     type = "LAN",
-    device_network_id = 'vswitcher-' .. lua_socket.gettime(),
-    label = LABEL,
+    device_network_id = "v-" .. random_id(20),
+    label = device_name,
     profile = PROFILE,
     manufacturer = "SmartThings Community",
-    model = "vswitcher",
-    vendor_provided_label = LABEL,
+    model = MODEL,
+    vendor_provided_label = device_name,
   }
                       
   assert (driver:try_create_device(create_device_msg))
 
 end
 
+-- Add device: scan nearby
 local function discovery_handler(driver, _, should_continue)
   if not created then
     log.debug("Discovered")
-    create_device(driver)
+    create_device(driver, DEFAULT_NAME)
   end
+end
+
+-- Create button
+local function handle_create(driver, device, command)
+	local device_count = #driver:get_devices()
+  local device_name = string.format("%s %d", DEFAULT_NAME, device_count + 1)
+  create_device(driver, device_name)
 end
 
 --[[
@@ -242,9 +331,9 @@ end
    2) a device was newly added to the driver.
 ]]
 local function device_init(driver, device)
-  log.debug("Init")
   created = true
   local default_scene = default_scene(device)
+  log.debug("Initializing. Default scene: " .. default_scene)
   device:set_field(CURRENT_SCENE_FIELD, default_scene)
   -- Setting value to 0 on initialization to avoid triggering user defined scenes.
   -- While SmartThings has a state_change attribute, documentation says 
@@ -275,10 +364,6 @@ local function device_removed(driver, device)
   end
 end
 
-local function handle_create(driver, device, command)
-	create_device(driver)
-end
-
 local switcher = Driver("virtual-scene-switcher", {
   discovery = discovery_handler,
   lifecycle_handlers = {
@@ -292,7 +377,6 @@ local switcher = Driver("virtual-scene-switcher", {
     },
     [active_scene.ID] = {
       [active_scene.commands.activateScene.NAME] = handle_activate_scene,
-      [active_scene.commands.presetScene.NAME] = handle_preset_scene
     }
   }
 })

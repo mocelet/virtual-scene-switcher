@@ -1,14 +1,14 @@
 # Virtual Scene Switcher for SmartThings
 
-Feature-packed virtual device for SmartThings that facilitates cycling through scenes with smart buttons, forwards and backwards in circular and linear fashion, as well as pre-setting scenes for a later recall.
+Feature-packed companion for smart buttons that facilitates cycling through scenes, forwards and backwards in circular and linear fashion. It is able to cycle automatically and in random order plus has some extra perks to fit other use cases and multiple configuration options.
 
 ## Unique features:
 - Minimizes the number of routines needed and simplifies them.
-- Pre-set scene survives hub and driver restarts.
 - Supports circular and linear cycling in both directions.
-- Recall feature to activate the last active or pre-set scene.
+- Allows re-activating the current scene.
 - Actions to switch to next / previous / initial / final scene.
-- Auto-cycling actions to cycle through scenes with start/stop, useful for custom wake-up lights too!
+- Auto-cycling actions to cycle through scenes with start/stop.
+- 'Surprise me' and random auto-cycling modes to fight monotony!
 
 ## Notes for End Users
 
@@ -22,7 +22,7 @@ The driver can be installed in the hub directly from the 'mocelet-shared' driver
 
 The work is inspired by [Todd Austin's Counter Utility](https://github.com/toddaustin07/counter_utility) which was the solution I used to track scenes and switch them with smart buttons. It also helped me a lot to understand how virtual devices in SmartThings work. Thanks, Todd!
 
-In a way, this driver is a scene-specialized counter with a few twists. It does not need extra routines to handle the cycling and can even perform automatic cycling with customizable delay. Also allows to pre-set the scene number without triggering the associated routine, in other words, the internal value and the value known to SmartThings are decoupled. That way, it can also re-trigger the last active / pre-set scene, useful to restore the state after turning off the lights or schedule scenes throughout the day that will only activate when pressing the "on" button. The automation actions are all in the Main component to avoid issues with SmartThings sometimes not displaying certain actions.
+At its core, this driver is a specialised virtual counter with a few twists and scene-oriented design decisions. It does not need extra routines to handle the cycling and can even perform automatic cycling with customizable delay and direction. It can reactivate the current scene to restore the state with a button after turning off the lights. The automation actions are all in the Main component to avoid issues with SmartThings sometimes not displaying certain component actions.
 
 ## License
 
