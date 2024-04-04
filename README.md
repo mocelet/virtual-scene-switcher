@@ -1,6 +1,6 @@
 # Virtual Scene Switcher for SmartThings
 
-Feature-packed companion for smart buttons that facilitates cycling through scenes, forwards and backwards in circular and linear fashion. It is able to cycle automatically and in random order plus has some extra perks to fit other use cases and multiple configuration options.
+Feature-packed companion for smart buttons that not only facilitates cycling through scenes, forwards and backwards in circular and linear fashion. It is able to cycle automatically and in random order plus can convert a regular button into a multi-tap capable one.
 
 ## Unique features:
 - Minimizes the number of routines needed and simplifies them.
@@ -9,6 +9,7 @@ Feature-packed companion for smart buttons that facilitates cycling through scen
 - Actions to switch to next / previous / initial / final scene.
 - Auto-cycling actions to cycle through scenes with start/stop.
 - 'Surprise me' and random auto-cycling modes to fight monotony!
+- Adds multi-tap support for buttons without that feature!
 
 ## Notes for End Users
 
@@ -20,7 +21,7 @@ The driver can be installed in the hub directly from the 'mocelet-shared' driver
 
 ## Credits and implementation details
 
-The work is inspired by [Todd Austin's Counter Utility](https://github.com/toddaustin07/counter_utility) which was the solution I used to track scenes and switch them with smart buttons. It also helped me a lot to understand how virtual devices in SmartThings work. Thanks, Todd!
+The work was initially inspired by [Todd Austin's Counter Utility](https://github.com/toddaustin07/counter_utility) which was the solution I used to track scenes and switch them with smart buttons. It also helped me a lot to understand how virtual devices in SmartThings work. Thanks, Todd!
 
 At its core, this driver is a specialised virtual counter with a few twists and scene-oriented design decisions. It does not need extra routines to handle the cycling and can even perform automatic cycling with customizable delay and direction. It can reactivate the current scene to restore the state with a button after turning off the lights. The automation actions are all in the Main component to avoid issues with SmartThings sometimes not displaying certain component actions.
 

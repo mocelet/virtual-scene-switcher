@@ -44,6 +44,8 @@
                   "autoBackwards",
                   "autoRandom",
                   "autoStop",
+                  "tap",
+                  "doubleTap",
                   "1",
                   "2",
                   "3",

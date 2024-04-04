@@ -15,7 +15,8 @@
 
   Helper to facilitate cycling through scenes in SmartThings, featuring 
   both manual and auto-cycling with customizable delay time, modes and
-  other behaviours.
+  other handy features like multi-tap emulation for buttons that do not
+  feature multi-tap.
 
   Originally it featured presetting/recalling scenes using persistent storage
   but it has been removed. According to the official documentation, persistent 
@@ -48,6 +49,11 @@ local create_switcher = capabilities["panelorange55982.createSwitcher"]
 local autocycle = {}
 local AUTOCYCLE_TIMER = "autocycle.timer"
 
+local multitap = {}
+local MULTITAP_TIMER = "multitap.timer"
+local MULTITAP_COUNT = "multitap.count"
+local MULTITAP_DEFAULT_DELAY_SEC = 0.5
+
 local created = false
 local random_seeded = false
 
@@ -64,7 +70,9 @@ local Actions = {
   AUTOCYCLE_FORWARDS = "autoForwards",
   AUTOCYCLE_BACKWARDS = "autoBackwards",
   AUTOCYCLE_RANDOM = "autoRandom",
-  AUTOCYCLE_STOP = "autoStop"
+  AUTOCYCLE_STOP = "autoStop",
+  TAP = "tap",
+  DOUBLE_TAP = "doubleTap",
 }
 
 local CycleModes = {
@@ -204,6 +212,9 @@ local function handle_activate_scene(driver, device, cmd)
     autocycle.start(device, delay, step)
   elseif action == Actions.AUTOCYCLE_STOP then
     autocycle.stop(device)
+  elseif action == Actions.TAP or action == Actions.DOUBLE_TAP then
+    local taps = action == Actions.DOUBLE_TAP and 2 or 1
+    multitap.handle_taps(device, taps, device.preferences.multiTapDelayMillis)
   else -- Actions "1", "2"...
     local scene_number = math.tointeger(action)
     local preset_mode = preset_mode_enabled(device)
@@ -282,6 +293,57 @@ end
 
 autocycle.running = function(device)
   return device:get_field(AUTOCYCLE_TIMER)
+end
+
+--[[ MULTI-TAP EMULATION MODE
+
+Makes any button able to run actions with double-tap, triple-tap, etc. 
+Even buttons with native double-tap can be extended!
+
+Each scene activated represents the type, for instance 1 single-tap, 2 double-tap, 
+3 tripe-tap and so on.
+
+User only needs to Register Pressed or Double events in their button. For buttons
+with native double-tap, the delay should be larger than the native window.
+
+]]
+
+multitap.finish = function(device)
+  local tap_count = device:get_field(MULTITAP_COUNT) or 0
+  local target_scene = math.min(tap_count, scenes_count(device))
+  device:set_field(MULTITAP_TIMER, nil)
+  device:set_field(MULTITAP_COUNT, nil)
+  activate_scene(device, target_scene)
+end
+
+multitap.stop_timer = function(device)
+  local timer = device:get_field(MULTITAP_TIMER)
+  if timer then
+    device.thread:cancel_timer(timer)
+    device:set_field(MULTITAP_TIMER, nil)
+  end
+end
+
+multitap.callback = function(device)
+  return function()
+    -- No taps during waiting period
+    multitap.finish(device)
+  end
+end
+
+multitap.handle_taps = function(device, taps, multitap_window_millis)
+  multitap.stop_timer(device)
+  local max_taps = scenes_count(device)
+  local previous_tap_count = device:get_field(MULTITAP_COUNT) or 0
+  local tap_count = previous_tap_count + taps
+  device:set_field(MULTITAP_COUNT, tap_count)
+  if tap_count >= max_taps then
+    multitap.finish(device)
+  else
+    local delay = multitap_window_millis and multitap_window_millis / 1000 or MULTITAP_DEFAULT_DELAY_SEC
+    timer = device.thread:call_with_delay(delay, multitap.callback(device))
+    device:set_field(MULTITAP_TIMER, timer)
+  end
 end
 
 -- VIRTUAL DEVICE CREATION AND LIFECYCLE HANDLING

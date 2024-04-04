@@ -29,7 +29,7 @@
         ],
         "actions": [
             {
-                "label": "Activate scene",
+                "label": "Action",
                 "displayType": "list",
                 "list": {
                     "command": "activateScene",
@@ -40,51 +40,59 @@
                         },
                         {
                             "key": "next",
-                            "value": "Next ( > )"
+                            "value": "Next [ > ]"
                         },
                         {
                             "key": "previous",
-                            "value": "Previous ( < )"
+                            "value": "Previous [ < ]"
                         },
                         {
                             "key": "next2",
-                            "value": "Skip Next ( +2 )"
+                            "value": "Skip Next [ +2 ]"
                         },
                         {
                             "key": "previous2",
-                            "value": "Skip Previous ( -2 )"
+                            "value": "Skip Previous [ -2 ]"
                         },
                         {
                             "key": "first",
-                            "value": "Initial ( << )"
+                            "value": "Initial [ << ]"
                         },
                         {
                             "key": "last",
-                            "value": "Final ( >> )"
+                            "value": "Final [ >> ]"
                         },
                         {
                             "key": "default",
-                            "value": "Default ( * )"
+                            "value": "Default [ * ]"
                         },
                         {
                             "key": "surpriseme",
-                            "value": "Surprise me ( ? )"
+                            "value": "Surprise Me [ ? ]"
                         },
                         {
                             "key": "autoForwards",
-                            "value": "Auto-cycle forwards"
+                            "value": "Auto-cycle [ > ]"
                         },
                         {
                             "key": "autoBackwards",
-                            "value": "Auto-cycle backwards"
+                            "value": "Auto-cycle [ < ]"
                         },
                         {
                             "key": "autoRandom",
-                            "value": "Auto-cycle random"
+                            "value": "Auto-cycle [ ? ]"
                         },
                         {
                             "key": "autoStop",
-                            "value": "Auto-cycle stop"
+                            "value": "Auto-cycle [ STOP ]"
+                        },
+                        {
+                            "key": "tap",
+                            "value": "Register Pressed"
+                        },
+                        {
+                            "key": "doubleTap",
+                            "value": "Register Double"
                         },
                         {
                             "key": "1",
