@@ -165,11 +165,18 @@ local function scene_in_range(device, scene_number)
   local cycle_mode = cycle_mode(device)
   local scenes_count = scenes_count(device)
   local result = scene_number
-  if scene_number > scenes_count then
-    result = cycle_mode == CycleModes.CIRCULAR and 1 or scenes_count
-  elseif scene_number < 1 then
-    result = cycle_mode == CycleModes.CIRCULAR and scenes_count or 1
+
+  if cycle_mode == CycleModes.LINEAR then
+    if scene_number > scenes_count then
+      result = scenes_count
+    elseif scene_number < 1 then
+      result = 1
+    end
+  elseif cycle_mode == CycleModes.CIRCULAR then
+    local modulo = scene_number % scenes_count 
+    result = modulo == 0 and scenes_count or modulo
   end
+
   return math.tointeger(result)
 end
 
