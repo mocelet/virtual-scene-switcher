@@ -13,7 +13,9 @@ Feature-packed companion for smart buttons that not only facilitates cycling thr
 
 ## Notes for End Users
 
-Check out the official post at SmartThings Community with use cases and instructions.
+Check out the official post at SmartThings Community with use cases and instructions:
+
+- https://community.smartthings.com/t/edge-virtual-scene-switcher-more-than-a-fun-way-to-cycle-through-scenes/280621
 
 The driver can be installed in the hub directly from the 'mocelet-shared' driver channel at:
 
