@@ -84,7 +84,8 @@ local AutocycleStartingScene = {
   NEXT_PREV = "nextprev",
   CURRENT = "current",
   INITIAL = "initial",
-  FINAL = "final"
+  FINAL = "final",
+  FIRST_SECOND = "firstSecond"
 }
 
 local AutostopBehaviour = {
@@ -243,6 +244,8 @@ local function autocycle_starting_scene(device, step)
     return scenes_count(device)
   elseif starting_pref == AutocycleStartingScene.CURRENT then
     return current_scene(device)
+  elseif starting_pref == AutocycleStartingScene.FIRST_SECOND then
+      return step < 0 and 1 or 2
   else
     return current_scene(device) + step
   end
@@ -283,7 +286,7 @@ autocycle.start = function(device, delay_seconds, step)
     message = "[Auto-cycle] Started sequential cycling"
     starting_scene = autocycle_starting_scene(device, step)
   end
-  log.debug(string.format("%s from scene %d. Step: %d. Delay: %d s", message, starting_scene, step, delay_seconds))
+  --log.debug(string.format("%s from scene %d. Step: %d. Delay: %f s", message, starting_scene, step, delay_seconds))
 
   local first_step = autocycle.callback(device, delay_seconds, step, 0, starting_scene)
   first_step()

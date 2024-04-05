@@ -64,13 +64,14 @@ preferences:
     preferenceType: boolean
     definition:
       default: false         
-  - title: "Starting scene (def: next / prev)"
+  - title: "Starting scene (def: prev / next)"
     name: autocycleStartingScene
     required: true
     preferenceType: enumeration 
     definition:
       options:
-        "nextprev": "Next / Previous scene"
+        "nextprev": "< Previous / Next >"
+        "firstSecond": "< Scene 1 / Scene 2 >"
         "current": "Current scene (reactivate)"
         "initial": "Initial scene"
         "final": "Final scene"
