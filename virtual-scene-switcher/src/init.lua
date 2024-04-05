@@ -85,6 +85,7 @@ local AutocycleStartingScene = {
   CURRENT = "current",
   INITIAL = "initial",
   FINAL = "final",
+  FINAL_INITIAL = "finalInitial",
   FIRST_SECOND = "firstSecond"
 }
 
@@ -244,6 +245,8 @@ local function autocycle_starting_scene(device, step)
     return scenes_count(device)
   elseif starting_pref == AutocycleStartingScene.CURRENT then
     return current_scene(device)
+  elseif starting_pref == AutocycleStartingScene.FINAL_INITIAL then
+    return step < 0 and scenes_count(device) or 1
   elseif starting_pref == AutocycleStartingScene.FIRST_SECOND then
       return step < 0 and 1 or 2
   else

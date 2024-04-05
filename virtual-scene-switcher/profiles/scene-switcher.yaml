@@ -71,10 +71,11 @@ preferences:
     definition:
       options:
         "nextprev": "< Previous / Next >"
+        "finalInitial": "< Final / Initial >"
         "firstSecond": "< Scene 1 / Scene 2 >"
-        "current": "Current scene (reactivate)"
-        "initial": "Initial scene"
-        "final": "Final scene"
+        "current": "Current (reactivate)"
+        "initial": "Initial"
+        "final": "Final"
       default: "nextprev"
   - title: "Switching delay (def: 1000 ms)"
     name: autocycleDelay
