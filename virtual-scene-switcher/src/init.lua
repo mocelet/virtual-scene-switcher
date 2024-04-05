@@ -405,12 +405,9 @@ end
 local function device_init(driver, device)
   created = true
   local default_scene = default_scene(device)
-  log.debug("Initializing. Default scene: " .. default_scene)
-  device:set_field(CURRENT_SCENE_FIELD, default_scene)
-  -- Setting value to 0 on initialization to avoid triggering user defined scenes.
-  -- While SmartThings has a state_change attribute, documentation says 
-  -- that "state_change = false is not guaranteed to be treated as not a state change"
-  device:emit_component_event(device.profile.components.main, active_scene.scene({value = 0}))
+  local current_scene = device:get_latest_state("main", active_scene.ID, active_scene.scene.NAME, default_scene)
+  log.debug("Initializing with scene: " .. current_scene)
+  device:set_field(CURRENT_SCENE_FIELD, current_scene)
 end
 
 --[[
