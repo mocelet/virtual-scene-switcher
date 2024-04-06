@@ -18,14 +18,10 @@
   other handy features like multi-tap emulation for buttons that do not
   feature multi-tap.
 
-  Originally it featured presetting/recalling scenes using persistent storage
-  but it has been removed. According to the official documentation, persistent 
-  storage should be almost avoided because "carries with it a cost in wear [of 
-  the hub], as well as time delays associated with the writing and reading".
-  
-  Preset feature is now implemented using transient fields, meaning it will
-  not survive restarts. However, there is a setting to specify the default scene used
-  in that case and minimize the inconvenience.
+  Includes detection for unwanted side effects or potential infinite
+  loops when used with routines to sync the state. A typical example would be
+  synchronizing the scene number by changing it when the brightness changes. 
+  If the scene action also changes the brightness, a loop could happen.
     
   Capabilities and presentations have to be created with the command line, e.g.:
    smartthings capabilities:create -i switcher-capability.json
@@ -53,6 +49,10 @@ local multitap = {}
 local MULTITAP_TIMER = "multitap.timer"
 local MULTITAP_COUNT = "multitap.count"
 local MULTITAP_DEFAULT_DELAY_SEC = 0.5
+
+local LAST_ACTIVATION_TIME_FIELD = "activation.time"
+local DEFAULT_SIDE_EFFECT_RELATIVE_WINDOW = 0
+local DEFAULT_SIDE_EFFECT_TARGETED_WINDOW = 0.8
 
 local created = false
 local random_seeded = false
@@ -99,6 +99,9 @@ local function random_seed_once()
     log.debug("Random generator seeded")
     random_seeded = true
     math.randomseed(os.time())
+    -- Looks like it's not truly random right after seeding
+    math.random()
+    math.random()
     math.random()
   end
 end
@@ -185,14 +188,61 @@ end
 local function activate_scene(device, scene_number)
   local target_scene = scene_in_range(device, scene_number)
   device:set_field(CURRENT_SCENE_FIELD, target_scene)
+  device:set_field(LAST_ACTIVATION_TIME_FIELD, lua_socket.gettime()) -- side effect detection
   device:emit_component_event(device.profile.components.main, active_scene.scene({value = target_scene}, {state_change = true}))
 end
+
+-- SIDE_EFFECT DETECTION
+-- Using the Switcher in certain automations to sync states can lead to unwanted results.
+-- There are two windows, a smaller one for actions usually tied to a button that are expected to be invoked
+-- multiple times in a row (like next/prev) and a larger one for actions targetting specific scenes.
+
+local function specific_scene_target(action)
+  return action == Actions.FIRST or action == Actions.LAST or action == Actions.DEFAULT or math.tointeger(action)
+end
+
+local function within_delay(timestamp, delay)
+  local now = lua_socket.gettime()
+  if timestamp then
+    local elapsed = now - timestamp
+    return elapsed >= 0 and elapsed <= delay
+  else
+    return false
+  end
+end
+
+local function last_activation_within_delay(device, delay)
+  return within_delay(device:get_field(LAST_ACTIVATION_TIME_FIELD), delay)
+end
+
+local function any_action_window(device)
+  return device.preferences.sideEffectNoTargetWindow and device.preferences.sideEffectNoTargetWindow / 1000 or DEFAULT_SIDE_EFFECT_RELATIVE_WINDOW
+end
+
+local function targeted_action_window(device)
+  return device.preferences.sideEffectTargetWindow and device.preferences.sideEffectTargetWindow / 1000 or DEFAULT_SIDE_EFFECT_TARGETED_WINDOW
+end
+
+local function side_effect_detected(device, action)
+  if specific_scene_target(action) then
+    return last_activation_within_delay(device, targeted_action_window(device))
+  else
+    return last_activation_within_delay(device, any_action_window(device))
+  end
+end
+
+-- MAIN HANDLING
 
 local function handle_activate_scene(driver, device, cmd)
   local autocycle_was_running = autocycle.running(device)
   autocycle.stop(device) -- Stopping autocycle with any action is convenient
-
+  
   local action = cmd.args.scene
+  if side_effect_detected(device, action) then
+    log.debug("[Side-effect detector] Ignored command to switch scene right after activating scene")
+    return
+  end
+  
   if action == Actions.NEXT or action == Actions.PREV then
     local step = action == Actions.NEXT and 1 or -1
     activate_scene(device, current_scene(device) + step)
@@ -373,7 +423,7 @@ end
 local function create_device(driver, device_name)
   local create_device_msg = {
     type = "LAN",
-    device_network_id = "v-" .. random_id(20),
+    device_network_id = "v-" .. random_id(4) .. lua_socket.gettime(), -- Lua random is not always random even seeded
     label = device_name,
     profile = PROFILE,
     manufacturer = "SmartThings Community",

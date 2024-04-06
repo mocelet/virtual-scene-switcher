@@ -136,3 +136,29 @@ preferences:
     preferenceType: boolean
     definition:
       default: false
+  - name: "introAdvanced"
+    title: "ADVANCED tweaks"
+    description: "The driver detects unwanted side effects or potential loops when using routines by suppressing certain commands received right after activating a scene."
+    required: true
+    preferenceType: string
+    definition:
+      stringType: text
+      minLength: 0
+      maxLength: 0
+      default: ""
+  - title: "Targeted action window (def: 800ms)"
+    name: sideEffectTargetWindow
+    required: true
+    preferenceType: number
+    definition:
+      minimum: 0
+      default: 800
+      maximum: 10000
+  - title: "Other actions window (def: 0ms)"
+    name: sideEffectNoTargetWindow
+    required: true
+    preferenceType: number
+    definition:
+      minimum: 0
+      default: 0
+      maximum: 10000
