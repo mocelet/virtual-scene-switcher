@@ -33,7 +33,7 @@ local MODEL = "Virtual Scene Switcher"
 local PROFILE = "scene-switcher"
 local DEFAULT_SCENES_COUNT = 4
 local CURRENT_SCENE_FIELD = "scene.current"
-local PRESET_SCENE_FIELD = "scene.memory"
+local PRESET_SCENE_PERSISTENT_FIELD = "scene.preset"
 local capabilities = require "st.capabilities"
 local Driver = require "st.driver"
 local lua_socket = require "socket"
@@ -111,7 +111,7 @@ local function current_scene(device)
 end
 
 local function preset_scene(device)
-  return device:get_field(PRESET_SCENE_FIELD) or current_scene(device)
+  return device:get_field(PRESET_SCENE_PERSISTENT_FIELD) or current_scene(device)
 end
 
 local function default_scene(device)
@@ -281,9 +281,8 @@ local function handle_activate_scene(driver, device, cmd)
       return -- not starting the auto-cycle
     end
     local random = action == Actions.AUTOCYCLE_RANDOM
-    local delay = device.preferences.autocycleDelay and device.preferences.autocycleDelay / 1000 or 1
     local step = random and 0 or (action == Actions.AUTOCYCLE_FORWARDS and 1 or -1)
-    autocycle.start(device, delay, step)
+    autocycle.start(device, step)
   elseif action == Actions.AUTOCYCLE_STOP then
     autocycle.stop(device)
   elseif action == Actions.TAP or action == Actions.DOUBLE_TAP then
@@ -298,7 +297,7 @@ local function handle_activate_scene(driver, device, cmd)
 
     local preset_mode = preset_mode_enabled(device)
     if scene_number and preset_mode then
-      device:set_field(PRESET_SCENE_FIELD, scene_number) 
+      device:set_field(PRESET_SCENE_PERSISTENT_FIELD, scene_number, { persist = true }) 
     elseif scene_number and not preset_mode then
       activate_scene(device, scene_number)
     end
@@ -306,6 +305,17 @@ local function handle_activate_scene(driver, device, cmd)
 end
 
 -- AUTO-CYCLE FEATURE
+
+local function autocycle_delay(device) 
+  local delay = device.preferences.autocycleDelay and device.preferences.autocycleDelay / 1000 or 1
+  local max_offset = device.preferences.autocycleRandomOffset and device.preferences.autocycleRandomOffset / 1000 or 0
+  if max_offset < 1 then
+    return delay
+  else
+    random_seed_once()
+    return delay + math.random(0, max_offset)
+  end
+end
 
 local function autocycle_starting_scene(device, step)
   local starting_pref = device.preferences.autocycleStartingScene
@@ -324,7 +334,7 @@ local function autocycle_starting_scene(device, step)
   end
 end
 
-autocycle.callback = function(device, delay_seconds, step, switch_count, scene)
+autocycle.callback = function(device, step, switch_count, scene)
   return function()
     activate_scene(device, scene)
     local updated_switch_count = switch_count + 1
@@ -342,12 +352,12 @@ autocycle.callback = function(device, delay_seconds, step, switch_count, scene)
     end
 
     -- Prepare next switch
-    local timer = device.thread:call_with_delay(delay_seconds, autocycle.callback(device, delay_seconds, step, updated_switch_count, target_scene))  
+    local timer = device.thread:call_with_delay(autocycle_delay(device), autocycle.callback(device, step, updated_switch_count, target_scene))  
     device:set_field(AUTOCYCLE_TIMER, timer) 
   end
 end
 
-autocycle.start = function(device, delay_seconds, step)
+autocycle.start = function(device, step)
   autocycle.stop(device)
  
   local message
@@ -359,9 +369,7 @@ autocycle.start = function(device, delay_seconds, step)
     message = "[Auto-cycle] Started sequential cycling"
     starting_scene = autocycle_starting_scene(device, step)
   end
-  --log.debug(string.format("%s from scene %d. Step: %d. Delay: %f s", message, starting_scene, step, delay_seconds))
-
-  local first_step = autocycle.callback(device, delay_seconds, step, 0, starting_scene)
+  local first_step = autocycle.callback(device, step, 0, starting_scene)
   first_step()
 end
 
