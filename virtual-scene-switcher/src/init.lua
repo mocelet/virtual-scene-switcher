@@ -22,6 +22,10 @@
   loops when used with routines to sync the state. A typical example would be
   synchronizing the scene number by changing it when the brightness changes. 
   If the scene action also changes the brightness, a loop could happen.
+
+  Auto-cycle can store the timer information in persistent memory and restore
+  it on initialisation.
+
     
   Capabilities and presentations have to be created with the command line, e.g.:
    smartthings capabilities:create -i switcher-capability.json
@@ -44,6 +48,9 @@ local create_switcher = capabilities["panelorange55982.createSwitcher"]
 
 local autocycle = {}
 local AUTOCYCLE_TIMER = "autocycle.timer"
+local AUTOCYCLE_BACKUP_PERSISTENT_FIELD = "autocycle.backup"
+local AUTOCYCLE_PERSISTED_FIELD = "autocycle.persisted"
+local AUTOCYCLE_BACKUP_MIN_DELAY_SEC_DEFAULT = 1800 -- 30 minutes
 
 local multitap = {}
 local MULTITAP_TIMER = "multitap.timer"
@@ -152,6 +159,9 @@ end
 
 local function max_autocycle_switches(device)
   local max_loops = device.preferences.autocycleMaxLoops or 1
+  if scenes_count(device) == 1 then
+    return max_loops
+  end
   local max_switches = max_loops * scenes_count(device)
   local autostop_offset = autostop_behaviour(device) == AutostopBehaviour.MINUS_ONE and 0 or 1
   return max_switches + autostop_offset 
@@ -307,13 +317,17 @@ end
 -- AUTO-CYCLE FEATURE
 
 local function autocycle_delay(device) 
-  local delay = device.preferences.autocycleDelay and device.preferences.autocycleDelay / 1000 or 1
-  local max_offset = device.preferences.autocycleRandomOffset and device.preferences.autocycleRandomOffset / 1000 or 0
-  if max_offset < 1 then
-    return delay
-  else
+  -- Mind that long auto-cycle settings (minutes) override the standard ones (millis) if non-zero
+  local standard_delay = device.preferences.autocycleDelay and device.preferences.autocycleDelay / 1000 or 1
+  local long_delay = device.preferences.autocycleDelayMinutes and device.preferences.autocycleDelayMinutes * 60 or 0
+  local delay = long_delay > 0 and long_delay or standard_delay
+
+  local max_random_offset = device.preferences.autocycleRandomMinutes and device.preferences.autocycleRandomMinutes * 60 or 0  
+  if max_random_offset > 0 then
     random_seed_once()
-    return delay + math.random(0, max_offset)
+    return delay + math.random(0, max_random_offset)
+  else
+    return delay
   end
 end
 
@@ -334,15 +348,32 @@ local function autocycle_starting_scene(device, step)
   end
 end
 
+local function autocycle_start_timer(device, delay, step, switch_count, target_scene)
+  local timer = device.thread:call_with_delay(delay, autocycle.callback(device, step, switch_count, target_scene))  
+  device:set_field(AUTOCYCLE_TIMER, timer) 
+  autocycle.may_backup(device, delay, step, switch_count, target_scene)
+end
+
 autocycle.callback = function(device, step, switch_count, scene)
   return function()
-    activate_scene(device, scene)
-    local updated_switch_count = switch_count + 1
-    local target_scene = step == 0 and random_scene(device) or current_scene(device) + step
-    
+    local target_scene
+    if switch_count == -1 then
+      -- First step has to be delayed too, do not activate now
+      target_scene = step == 0 and random_scene(device) or scene
+    else
+      activate_scene(device, scene)
+      target_scene = step == 0 and random_scene(device) or current_scene(device) + step
+    end
+
+    local updated_switch_count = switch_count + 1    
+
     -- Stop conditions
-    if reached_end(device, step) then
-      log.debug("[Auto-cycle] Stopping. Reached end after cycling through " .. updated_switch_count .. " scenes")
+    if updated_switch_count == 1 and device.preferences.autocycleSwitchOnce then
+      log.debug("[Auto-cycle] Stopping after one switch")
+      autocycle.stop(device)
+      return
+    elseif updated_switch_count > 0 and reached_end(device, step) then
+      log.debug("[Auto-cycle] Stopping. Reached end after switching " .. updated_switch_count .. " scenes")
       autocycle.stop(device)
       return
     elseif updated_switch_count >= max_autocycle_switches(device) then
@@ -352,8 +383,8 @@ autocycle.callback = function(device, step, switch_count, scene)
     end
 
     -- Prepare next switch
-    local timer = device.thread:call_with_delay(autocycle_delay(device), autocycle.callback(device, step, updated_switch_count, target_scene))  
-    device:set_field(AUTOCYCLE_TIMER, timer) 
+    local delay = autocycle_delay(device)
+    autocycle_start_timer(device, delay, step, updated_switch_count, target_scene)
   end
 end
 
@@ -369,7 +400,8 @@ autocycle.start = function(device, step)
     message = "[Auto-cycle] Started sequential cycling"
     starting_scene = autocycle_starting_scene(device, step)
   end
-  local first_step = autocycle.callback(device, step, 0, starting_scene)
+  local initial_switch_count = device.preferences.autocycleDelayedStart and -1 or 0
+  local first_step = autocycle.callback(device, step, initial_switch_count, starting_scene)
   first_step()
 end
 
@@ -379,12 +411,81 @@ autocycle.stop = function(device)
     log.debug("[Auto-cycle] Stopped")
     device.thread:cancel_timer(timer)
     device:set_field(AUTOCYCLE_TIMER, nil)
+    autocycle.delete_backup(device)
   end
 end
 
 autocycle.running = function(device)
   return device:get_field(AUTOCYCLE_TIMER)
 end
+
+autocycle.delete_backup = function(device)
+  local persisted = device:get_field(AUTOCYCLE_PERSISTED_FIELD)
+  if not persisted then
+    return
+  end
+  log.debug("[Auto-cycle] Timer backup deleted")
+  device:set_field(AUTOCYCLE_PERSISTED_FIELD, nil)
+  device:set_field(AUTOCYCLE_BACKUP_PERSISTENT_FIELD, nil, { persist = true })  
+end
+
+autocycle.may_backup = function(device, delay, step, switch_count, target_scene)
+  local min_delay = device.preferences.autocyclePersistMin and device.preferences.autocyclePersistMin * 60 or AUTOCYCLE_BACKUP_MIN_DELAY_SEC_DEFAULT
+  if delay < min_delay then
+    -- log.debug("[Auto-cycle] Not persisting short spanned cycle")
+    return
+  end
+
+  local version = 1
+  local starting_time = os.time()
+  local serialized = version .. " " .. starting_time .. " " .. delay .. " " .. step .. " " .. switch_count .. " " .. target_scene
+  log.debug("[Auto-cycle] Backing up long spanned cycle: " .. serialized)
+  device:set_field(AUTOCYCLE_PERSISTED_FIELD, starting_time)
+  device:set_field(AUTOCYCLE_BACKUP_PERSISTENT_FIELD, serialized, { persist = true }) 
+end
+
+autocycle.restore = function(device)
+  local serialized_backup = device:get_field(AUTOCYCLE_BACKUP_PERSISTENT_FIELD)
+  if not serialized_backup then
+    return
+  end
+
+  device:set_field(AUTOCYCLE_BACKUP_PERSISTENT_FIELD, nil, { persist = true })
+
+  local numbers = {} 
+  for part in serialized_backup:gmatch("%S+") do
+    local number_value = tonumber(part)
+    if not number_value then
+      log.debug("[Auto-cycle] Wrong backup value")
+      return
+    end
+    table.insert(numbers, number_value)
+  end
+
+  if #numbers ~= 6 then
+    log.debug("[Auto-cycle] Wrong backup format")
+    return
+  end
+
+  local version = numbers[1]
+  local starting_time = numbers[2]
+  local restored_delay = numbers[3]
+  local step = numbers[4]
+  local switch_count = numbers[5]
+  local target_scene = numbers[6]
+
+  local elapsed_seconds = os.time() - starting_time
+  log.debug("[Auto-cycle] Elapsed time since backup: " .. elapsed_seconds .. " s")
+  local relaunch_delay = restored_delay - elapsed_seconds
+  if elapsed_seconds < 0 or relaunch_delay < 0 then
+    log.debug("[Auto-cycle] Backup out of time")
+    return
+  end
+
+  log.debug("[Auto-cycle] Timer restored. Switching scene in: " .. relaunch_delay .. " s")
+  autocycle_start_timer(device, relaunch_delay, step, switch_count, target_scene)
+end
+
 
 --[[ MULTI-TAP EMULATION MODE
 
@@ -489,6 +590,7 @@ local function device_init(driver, device)
   local current_scene = device:get_latest_state("main", active_scene.ID, active_scene.scene.NAME, default_scene)
   log.debug("Initializing with scene: " .. current_scene)
   device:set_field(CURRENT_SCENE_FIELD, current_scene)
+  autocycle.restore(device)
 end
 
 --[[
