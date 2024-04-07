@@ -130,6 +130,10 @@ local function scenes_count(device)
   return device.preferences.scenesCount or DEFAULT_SCENES_COUNT
 end
 
+local function scene_out_of_bounds(device, scene_number)
+  return not scene_number or scene_number < 1 or scene_number > scenes_count(device)
+end
+
 -- Returns a random scene different than the current one
 local function random_scene(device)
   random_seed_once()
@@ -162,8 +166,7 @@ local function reached_end(device, step)
     return false
   end
   local next = current_scene(device) + step
-  local max = scenes_count(device)
-  return next < 1 or next > max
+  return scene_out_of_bounds(device, next)
 end
 
 local function scene_in_range(device, scene_number)
@@ -223,6 +226,17 @@ local function targeted_action_window(device)
   return device.preferences.sideEffectTargetWindow and device.preferences.sideEffectTargetWindow / 1000 or DEFAULT_SIDE_EFFECT_TARGETED_WINDOW
 end
 
+local function may_reset_window(device, action)
+  -- The window resets upon receiving a scene number that does not belong to the range
+  -- and will not activate anything. Useful to build event suppression mechanisms.
+  local scene_number = math.tointeger(action)
+  if scene_number and scene_out_of_bounds(device, scene_number) then
+    log.debug("[Side-effect] Window reset")
+    device:set_field(LAST_ACTIVATION_TIME_FIELD, 0)
+    return false
+  end
+end
+
 local function side_effect_detected(device, action)
   if specific_scene_target(action) then
     return last_activation_within_delay(device, targeted_action_window(device))
@@ -239,7 +253,8 @@ local function handle_activate_scene(driver, device, cmd)
   
   local action = cmd.args.scene
   if side_effect_detected(device, action) then
-    log.debug("[Side-effect detector] Ignored command to switch scene right after activating scene")
+    log.debug("[Side-effect] Ignored command to switch scene right after activating scene")
+    may_reset_window(device, action)
     return
   end
   
@@ -276,6 +291,11 @@ local function handle_activate_scene(driver, device, cmd)
     multitap.handle_taps(device, taps, device.preferences.multiTapDelayMillis)
   else -- Actions "1", "2"...
     local scene_number = math.tointeger(action)
+    if scene_out_of_bounds(device, scene_number) then
+      log.debug("Scene out of bounds")
+      return -- Ignore action
+    end
+
     local preset_mode = preset_mode_enabled(device)
     if scene_number and preset_mode then
       device:set_field(PRESET_SCENE_FIELD, scene_number) 
