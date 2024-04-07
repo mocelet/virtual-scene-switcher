@@ -306,7 +306,7 @@ end
 
 autocycle.callback = function(device, delay_seconds, step, switch_count, scene)
   return function()
-    activate_scene(device, scene, true)
+    activate_scene(device, scene)
     local updated_switch_count = switch_count + 1
     local target_scene = step == 0 and random_scene(device) or current_scene(device) + step
     
@@ -404,7 +404,7 @@ multitap.handle_taps = function(device, taps, multitap_window_millis)
     multitap.finish(device)
   else
     local delay = multitap_window_millis and multitap_window_millis / 1000 or MULTITAP_DEFAULT_DELAY_SEC
-    timer = device.thread:call_with_delay(delay, multitap.callback(device))
+    local timer = device.thread:call_with_delay(delay, multitap.callback(device))
     device:set_field(MULTITAP_TIMER, timer)
   end
 end
