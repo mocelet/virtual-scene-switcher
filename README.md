@@ -1,19 +1,21 @@
 # Virtual Scene Switcher for SmartThings
 
-Feature-packed companion for smart buttons that not only facilitates cycling through scenes, forwards and backwards in circular and linear fashion. It is able to cycle automatically and in random order plus can convert a regular button into a multi-tap capable one.
+Meant as a feature-packed companion for smart buttons to facilitate cycling through scenes, forwards and backwards in circular and linear fashion, it can also add multi-tap capabilities to buttons without them. It is able to cycle automatically and in random order supporting long-spanning time frames, useful to easily build presence simulation routines where random lights will turn on after random times.
 
 ## Unique features:
-- Minimizes the number of routines needed and simplifies them.
+- Local execution on hub, no cloud or servers needed.
+- Minimizes the number of routines and simplifies them.
 - Supports circular and linear cycling in both directions.
-- Allows re-activating the current scene.
-- Actions to switch to next / previous / initial / final scene.
-- Auto-cycling actions to cycle through scenes with start/stop.
-- 'Surprise me' and random auto-cycling modes to fight monotony!
+- High-level commands to switch scenes or start auto-cycling.
+- 'Surprise Me' and random auto-cycling modes to fight monotony!
 - Adds multi-tap support for buttons without that feature!
+- Auto-cycle supports long-spanning time frames with optional persistence to restore the cycle after a hub or driver restart.
+- Configurable debouncing window that can be used as event suppressor for other devices.
+- Preset / Recall mode to schedule light changes during the day and activate them only when pressing a button.
 
 ## Notes for End Users
 
-Check out the official post at SmartThings Community with use cases and instructions:
+Check out the official post at SmartThings Community with instructions and tutorials like how to build a blinker!
 
 - https://community.smartthings.com/t/edge-virtual-scene-switcher-more-than-a-fun-way-to-cycle-through-scenes/280621
 
@@ -23,9 +25,9 @@ The driver can be installed in the hub directly from the 'mocelet-shared' driver
 
 ## Credits and implementation details
 
-The work was initially inspired by [Todd Austin's Counter Utility](https://github.com/toddaustin07/counter_utility) which was the solution I used to track scenes and switch them with smart buttons. It also helped me a lot to understand how virtual devices in SmartThings work. Thanks, Todd!
+The work was initially inspired by [Todd Austin's Counter Utility](https://github.com/toddaustin07/counter_utility) which was the solution I used to track scene numbers and switch them with smart buttons. It also helped me a lot to understand how virtual devices in SmartThings work. Thanks, Todd!
 
-At its core, this driver is a specialised virtual counter with a few twists and scene-oriented design decisions. It does not need extra routines to handle the cycling and can even perform automatic cycling with customizable delay and direction. It can reactivate the current scene to restore the state with a button after turning off the lights. The automation actions are all in the Main component to avoid issues with SmartThings sometimes not displaying certain component actions.
+At its core, this driver is a specialised virtual counter with a few twists and scene-oriented design decisions. It does not need extra routines to handle the cycling and can even perform automatic cycling with customizable delay and direction. It can reactivate the current scene to restore the state with a button after turning off the lights. The automation actions are all in the Main component to avoid issues with SmartThings sometimes not displaying certain component actions. Added support for long-spanning time frames extends the possible use cases.
 
 ## License
 
