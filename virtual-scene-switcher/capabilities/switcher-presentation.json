@@ -5,7 +5,15 @@
                 "label": "{{scene.value}}"
             }
         ],
-        "actions": []
+        "actions": [
+            {
+              "displayType": "pushButton",
+              "pushButton": {
+                "command": "activateScene",
+                "argument": "next"
+              }
+            }
+          ]
     },
     "detailView": [
         {
