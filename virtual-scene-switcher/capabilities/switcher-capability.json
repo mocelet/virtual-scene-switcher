@@ -46,6 +46,7 @@
                   "autoStop",
                   "tap",
                   "doubleTap",
+                  "mainAction",
                   "1",
                   "2",
                   "3",

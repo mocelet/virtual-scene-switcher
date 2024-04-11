@@ -80,6 +80,7 @@ local Actions = {
   AUTOCYCLE_STOP = "autoStop",
   TAP = "tap",
   DOUBLE_TAP = "doubleTap",
+  DASHBOARD = "mainAction"
 }
 
 local CycleModes = {
@@ -266,6 +267,13 @@ local function handle_activate_scene(driver, device, cmd)
     log.debug("[Side-effect] Ignored command to switch scene right after activating scene")
     may_reset_window(device, action)
     return
+  end
+
+  if action == Actions.DASHBOARD then
+    -- Preparation for incoming custom dashboard action. Capabilities and presentations must be updated before
+    -- updating the driver and that can take more than 18 hours. However, cannot update the presentation before 
+    -- the driver understands the new command or the dashboard button will not work for current users.
+    action = Actions.NEXT 
   end
   
   if action == Actions.NEXT or action == Actions.PREV then
