@@ -10,7 +10,7 @@
               "displayType": "pushButton",
               "pushButton": {
                 "command": "activateScene",
-                "argument": "next"
+                "argument": "mainAction"
               }
             }
           ]

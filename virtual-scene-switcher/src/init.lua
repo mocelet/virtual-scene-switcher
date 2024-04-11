@@ -61,6 +61,8 @@ local LAST_ACTIVATION_TIME_FIELD = "activation.time"
 local DEFAULT_SIDE_EFFECT_RELATIVE_WINDOW = 0
 local DEFAULT_SIDE_EFFECT_TARGETED_WINDOW = 0.8
 
+local SMART_REVERSE_DIRECTION_FIELD = "smart.reverse.step"
+
 local created = false
 local random_seeded = false
 
@@ -101,6 +103,21 @@ local AutostopBehaviour = {
   STARTING = "starting",
   MINUS_ONE = "minusone"
 }
+
+local DashboardMode = {
+  NEXT = "next",
+  LOOPING_NEXT = "loopingNext",
+  SMART_REVERSE = "smartReverse",
+  SMART_AUTO = "smartAuto",
+  SMART_AUTO_RANDOM = "smartAutoRandom",
+  SURPRISE = "surprise",
+  MULTITAP = "multitap",
+  DEFAULT_SCENE = "defaultScene",
+  REACTIVATE = "reactivate",
+  DISABLED = "disabled"
+}
+
+local DASHBOARD_BUTTON_MULTITAP_WINDOW = 1200 -- ms
 
 local function random_seed_once()
   if not random_seeded then
@@ -258,6 +275,36 @@ end
 
 -- MAIN HANDLING
 
+local function dashboard_target_action(device, autocycle_was_running)
+  local mode = device.preferences.dashboardMode or DashboardMode.SMART_REVERSE
+
+  if mode == DashboardMode.NEXT then
+    return Actions.NEXT
+  elseif mode == DashboardMode.LOOPING_NEXT then
+    return reached_end(device, 1) and Actions.FIRST or Actions.NEXT
+  elseif mode == DashboardMode.SMART_REVERSE then
+    local direction = device:get_field(SMART_REVERSE_DIRECTION_FIELD) or 1
+    direction = reached_end(device, direction) and direction * -1 or direction
+    device:set_field(SMART_REVERSE_DIRECTION_FIELD, direction)
+    return direction < 0 and Actions.PREV or Actions.NEXT
+  elseif mode == DashboardMode.SMART_AUTO then
+    return autocycle_was_running and Actions.AUTOCYCLE_STOP or Actions.AUTOCYCLE_FORWARDS
+  elseif mode == DashboardMode.SMART_AUTO_RANDOM then
+    return autocycle_was_running and Actions.AUTOCYCLE_STOP or Actions.AUTOCYCLE_RANDOM    
+  elseif mode == DashboardMode.SURPRISE then
+    return Actions.SURPRISE_ME
+  elseif mode == DashboardMode.DEFAULT_SCENE then
+    return Actions.DEFAULT
+  elseif mode == DashboardMode.REACTIVATE then
+    return Actions.REACTIVATE
+  elseif mode == DashboardMode.MULTITAP then
+    multitap.handle_taps(device, 1, DASHBOARD_BUTTON_MULTITAP_WINDOW)
+    return nil
+  else
+    return nil -- disabled
+  end
+end
+
 local function handle_activate_scene(driver, device, cmd)
   local autocycle_was_running = autocycle.running(device)
   autocycle.stop(device) -- Stopping autocycle with any action is convenient
@@ -269,13 +316,14 @@ local function handle_activate_scene(driver, device, cmd)
     return
   end
 
+  -- Dashboard button is smart and its actual action depends on the state and settings
   if action == Actions.DASHBOARD then
-    -- Preparation for incoming custom dashboard action. Capabilities and presentations must be updated before
-    -- updating the driver and that can take more than 18 hours. However, cannot update the presentation before 
-    -- the driver understands the new command or the dashboard button will not work for current users.
-    action = Actions.NEXT 
+    action = dashboard_target_action(device, autocycle_was_running)
+    if not action then
+      return -- Dashboard action is disabled or already handled
+    end
   end
-  
+
   if action == Actions.NEXT or action == Actions.PREV then
     local step = action == Actions.NEXT and 1 or -1
     activate_scene(device, current_scene(device) + step)

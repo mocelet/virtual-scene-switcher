@@ -48,6 +48,23 @@ preferences:
       minimum: 1
       default: 1
       maximum: 1000      
+  - title: "Dashboard button action"
+    name: dashboardMode
+    required: true
+    preferenceType: enumeration 
+    definition:
+      options:
+        "smartReverse": "Smart Next / Previous"
+        "next": "Standard Next"
+        "loopingNext": "Looping Next"
+        "smartAuto": "Smart Auto-cycle [ > / Stop ]"
+        "smartAutoRandom": "Smart Auto-cycle [ ? / Stop ]"
+        "multitap": "Multi-tap: N-tap for Scene N"
+        "surprise": "Surprise Me"
+        "defaultScene": "Default scene"
+        "reactivate": "Reactivate current"
+        "disabled": "Disabled"
+      default: "smartReverse"          
   - name: "introAutocycle"
     title: "AUTO-CYCLE tweaks"
     description: "The feature is designed for short attended scenarios only. Besides Stop, any command will stop it. The same start action can be configured as stop. By default, it will stop itself after completing a whole loop or, in linear mode, reaching the end."
