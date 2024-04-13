@@ -37,7 +37,6 @@ local MODEL = "Virtual Scene Switcher"
 local PROFILE = "scene-switcher"
 local DEFAULT_SCENES_COUNT = 4
 local CURRENT_SCENE_FIELD = "scene.current"
-local PRESET_SCENE_PERSISTENT_FIELD = "scene.preset"
 local capabilities = require "st.capabilities"
 local Driver = require "st.driver"
 local lua_socket = require "socket"
@@ -63,6 +62,8 @@ local DEFAULT_SIDE_EFFECT_TARGETED_WINDOW = 0.8
 
 local SMART_REVERSE_DIRECTION_FIELD = "smart.reverse.step"
 
+local PREVIOUS_PRESET_FIELD = "preset.previous"
+
 local created = false
 local random_seeded = false
 
@@ -72,6 +73,8 @@ local Actions = {
   SKIP_NEXT = "next2",
   SKIP_PREV = "previous2",
   REACTIVATE = "reactivate",
+  RECALL = "recall",
+  CONDITIONED_RECALL = "recallConditioned",
   FIRST = "first",
   LAST = "last",
   DEFAULT = "default",
@@ -135,12 +138,12 @@ local function current_scene(device)
   return device:get_field(CURRENT_SCENE_FIELD) or 1
 end
 
-local function preset_scene(device)
-  return device:get_field(PRESET_SCENE_PERSISTENT_FIELD) or current_scene(device)
-end
-
 local function default_scene(device)
   return math.tointeger(device.preferences.defaultScene or 1)
+end
+
+local function preset_scene(device)
+  return device:get_latest_state("main", active_scene.ID, active_scene.preset.NAME, default_scene(device))
 end
 
 local function cycle_mode(device)
@@ -185,10 +188,6 @@ local function max_autocycle_switches(device)
   return max_switches + autostop_offset 
 end
 
-local function preset_mode_enabled(device)
-  return device.preferences.presetRecallEnabled
-end
-
 local function reached_end(device, step)
   if cycle_mode(device) == CycleModes.CIRCULAR then
     return false
@@ -228,6 +227,11 @@ end
 -- There are two windows, a smaller one for actions usually tied to a button that are expected to be invoked
 -- multiple times in a row (like next/prev) and a larger one for actions targetting specific scenes.
 
+local function is_preset_action(action)
+  local scene_number = math.tointeger(action)
+  return scene_number and scene_number < 0
+end
+
 local function specific_scene_target(action)
   return action == Actions.FIRST or action == Actions.LAST or action == Actions.DEFAULT or math.tointeger(action)
 end
@@ -266,6 +270,10 @@ local function may_reset_window(device, action)
 end
 
 local function side_effect_detected(device, action)
+  if is_preset_action(action) then
+    return false -- Preset actions do not trigger scenes
+  end
+
   if specific_scene_target(action) then
     return last_activation_within_delay(device, targeted_action_window(device))
   else
@@ -339,9 +347,14 @@ local function handle_activate_scene(driver, device, cmd)
   elseif action == Actions.SURPRISE_ME then
     activate_scene(device, random_scene(device))
   elseif action == Actions.REACTIVATE then
-    local preset_mode = preset_mode_enabled(device)
-    local target_scene = preset_mode and preset_scene(device) or current_scene(device)
-    activate_scene(device, target_scene)
+    activate_scene(device, current_scene(device))
+  elseif action == Actions.RECALL then
+    activate_scene(device, preset_scene(device))
+  elseif action == Actions.CONDITIONED_RECALL then
+    local previous_preset = device:get_field(PREVIOUS_PRESET_FIELD)
+    if not previous_preset or previous_preset == current_scene(device) then
+      activate_scene(device, preset_scene(device))
+    end
   elseif action == Actions.AUTOCYCLE_FORWARDS or action == Actions.AUTOCYCLE_BACKWARDS or action == Actions.AUTOCYCLE_RANDOM then
     if autocycle_was_running and device.preferences.autocycleStartStops then
       return -- not starting the auto-cycle
@@ -354,19 +367,23 @@ local function handle_activate_scene(driver, device, cmd)
   elseif action == Actions.TAP or action == Actions.DOUBLE_TAP then
     local taps = action == Actions.DOUBLE_TAP and 2 or 1
     multitap.handle_taps(device, taps, device.preferences.multiTapDelayMillis)
-  else -- Actions "1", "2"...
-    local scene_number = math.tointeger(action)
+  else -- Actions "1", "2"... for activate, "-1", "-2"... for preset
+    local raw_number = math.tointeger(action)
+    local preset = raw_number and raw_number < 0
+    local scene_number = preset and raw_number * -1 or raw_number
+
     if scene_out_of_bounds(device, scene_number) then
       log.debug("Scene out of bounds")
       return -- Ignore action
     end
 
-    local preset_mode = preset_mode_enabled(device)
-    if scene_number and preset_mode then
-      device:set_field(PRESET_SCENE_PERSISTENT_FIELD, scene_number, { persist = true }) 
-    elseif scene_number and not preset_mode then
+    if preset then
+      local previous_preset = device:get_latest_state("main", active_scene.ID, active_scene.preset.NAME)
+      device:set_field(PREVIOUS_PRESET_FIELD, previous_preset)
+      device:emit_component_event(device.profile.components.main, active_scene.preset({value = scene_number}))
+    else
       activate_scene(device, scene_number)
-    end
+    end   
   end
 end
 

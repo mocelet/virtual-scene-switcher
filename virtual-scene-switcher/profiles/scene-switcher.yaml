@@ -175,22 +175,6 @@ preferences:
       minimum: 200
       default: 500
       maximum: 4000
-  - name: "introPreset"
-    title: "PRESET / RECALL mode"
-    description: "Changes behaviour to allow scheduling a preset scene (Scene N actions) without activating it until it is recalled (Reactivate action). Reactivate will not reactivate the current scene but the current preset. If the preset could not be recalled, current or default scene will activate instead."
-    required: true
-    preferenceType: string
-    definition:
-      stringType: text
-      minLength: 0
-      maxLength: 0
-      default: ""
-  - title: "Enable Scene N preset / recall"
-    name: presetRecallEnabled
-    required: true
-    preferenceType: boolean
-    definition:
-      default: false
   - name: "introAdvanced"
     title: "ADVANCED tweaks"
     description: "The driver detects unwanted side effects or potential loops when using routines by suppressing certain commands received right after activating a scene."
