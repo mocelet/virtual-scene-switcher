@@ -121,7 +121,7 @@ preferences:
       maximum: 1000
   - name: longCyclesIntro
     title: "LONG SPANNING auto-cycle"
-    description: "In minutes. Overrides the switching delay when non-zero. For use cases like randomly turning on-off lights to simulate presence. Do not use for safety or security-critical purposes! Persisted cycles may be restored after a hub or driver restart but have a potential cost in flash memory wear."
+    description: "In minutes. Overrides the switching delay when non-zero. For use cases like randomly turning on-off lights to simulate presence. Do not use for safety or security-critical purposes! Delays of at least 1 minute are persisted and may survive a hub or driver restart."
     required: true
     preferenceType: string
     definition:
@@ -145,14 +145,6 @@ preferences:
       minimum: 0
       default: 0
       maximum: 1440      
-  - title: "Persist longer cycles (def: 30 min)"
-    name: autocyclePersistMin
-    required: true
-    preferenceType: integer
-    definition:
-      minimum: 1
-      default: 30
-      maximum: 2881
   - title: "Starting scene also delayed"
     name: autocycleDelayedStart
     required: true

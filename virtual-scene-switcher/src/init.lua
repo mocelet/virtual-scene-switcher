@@ -50,7 +50,7 @@ local autocycle = {}
 local AUTOCYCLE_TIMER = "autocycle.timer"
 local AUTOCYCLE_BACKUP_PERSISTENT_FIELD = "autocycle.backup"
 local AUTOCYCLE_PERSISTED_FIELD = "autocycle.persisted"
-local AUTOCYCLE_BACKUP_MIN_DELAY_SEC_DEFAULT = 1800 -- 30 minutes
+local AUTOCYCLE_BACKUP_MIN_DELAY = 60 -- 1 minute
 
 local multitap = {}
 local MULTITAP_TIMER = "multitap.timer"
@@ -486,9 +486,7 @@ autocycle.delete_backup = function(device)
 end
 
 autocycle.may_backup = function(device, delay, step, switch_count, target_scene)
-  local min_delay = device.preferences.autocyclePersistMin and device.preferences.autocyclePersistMin * 60 or AUTOCYCLE_BACKUP_MIN_DELAY_SEC_DEFAULT
-  if delay < min_delay then
-    -- log.debug("[Auto-cycle] Not persisting short spanned cycle")
+  if delay < AUTOCYCLE_BACKUP_MIN_DELAY then
     return
   end
 
