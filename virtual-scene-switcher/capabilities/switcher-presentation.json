@@ -33,6 +33,23 @@
                     "value": "scene.value",
                     "valueType": "integer" 
                 }
+            },
+            {
+                "label": "Auto-cycle",
+                "displayType": "list",
+                "list": {
+                    "value": "autocycle.value",
+                    "alternatives": [
+                        {
+                            "key": "started",
+                            "value": "started"
+                        },
+                        {
+                            "key": "stopped",
+                            "value": "stopped"
+                        }
+                    ]
+                }
             }
         ],
         "actions": [
@@ -61,6 +78,10 @@
                         {
                             "key": "previous2",
                             "value": "Skip Previous [ -2 ]"
+                        },
+                        {
+                            "key": "smartNextPrev",
+                            "value": "Smart Next / Prev"
                         },
                         {
                             "key": "first",

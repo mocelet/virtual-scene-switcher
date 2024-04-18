@@ -34,6 +34,25 @@
               ]
           },
           "enumCommands": []
+      },
+      "autocycle": {
+        "schema": {
+          "type": "object",
+          "properties": {
+            "value": {
+              "type": "string",
+              "enum": [
+                "started",
+                "stopped"
+              ]
+            }
+          },
+          "additionalProperties": false,
+          "required": [
+            "value"
+          ]
+        },
+        "enumCommands": []
       }
     },
     "commands": {
@@ -64,6 +83,7 @@
                   "tap",
                   "doubleTap",
                   "mainAction",
+                  "smartNextPrev",
                   "1",
                   "2",
                   "3",

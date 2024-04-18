@@ -39,6 +39,7 @@ preferences:
       options:
         "circular": "Circular. Loops through scenes"
         "linear": "Linear. Will not loop"
+        "reversing": "Reversing auto-cycle Linear"
       default: "circular"    
   - title: "Default scene"
     name: defaultScene
@@ -157,6 +158,15 @@ preferences:
     preferenceType: boolean
     definition:
       default: false            
+  - title: "Stopping actions"
+    name: autoStopCondition
+    required: true
+    preferenceType: enumeration 
+    definition:
+      options:
+        "external": "Any external scene change"
+        "none": "Stop action only"
+      default: "external"         
   - name: multiTapIntro
     title: "MULTI-TAP emulation"
     description: "The Switcher can turn any button into a multi-tap capable one! Use the action Register Pressed in your button pressed event. The active scene will be 1 for a single-tap, 2 for double-tap, 3 for triple and so on. If your button has native double-tap, do the same with Double and increase the delay."

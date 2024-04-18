@@ -85,12 +85,14 @@ local Actions = {
   AUTOCYCLE_STOP = "autoStop",
   TAP = "tap",
   DOUBLE_TAP = "doubleTap",
-  DASHBOARD = "mainAction"
+  DASHBOARD = "mainAction",
+  SMART_NEXT_PREV = "smartNextPrev"
 }
 
 local CycleModes = {
   CIRCULAR = "circular",
-  LINEAR = "linear"
+  LINEAR = "linear",
+  LINEAR_REVERSING = "reversing"
 }
 
 local AutocycleStartingScene = {
@@ -178,12 +180,22 @@ local function autostop_behaviour(device)
   return device.preferences.autostopBehaviour == AutostopBehaviour.MINUS_ONE and AutostopBehaviour.MINUS_ONE or AutostopBehaviour.STARTING
 end
 
+local function autostop_on_any_action(device)
+  return device.preferences.autoStopCondition ~= "none"
+end
+
 local function max_autocycle_switches(device)
   local max_loops = device.preferences.autocycleMaxLoops or 1
-  if scenes_count(device) == 1 then
+  local scenes_count = scenes_count(device)
+  if scenes_count == 1 then
     return max_loops
   end
-  local max_switches = max_loops * scenes_count(device)
+
+  local period = scenes_count
+  if cycle_mode(device) == CycleModes.LINEAR_REVERSING then
+    period = 2 * (scenes_count - 1)
+  end
+  local max_switches = max_loops * period
   local autostop_offset = autostop_behaviour(device) == AutostopBehaviour.MINUS_ONE and 0 or 1
   return max_switches + autostop_offset 
 end
@@ -199,9 +211,12 @@ end
 local function scene_in_range(device, scene_number)
   local cycle_mode = cycle_mode(device)
   local scenes_count = scenes_count(device)
-  local result = scene_number
+  if scenes_count == 1 then
+    return 1
+  end
 
-  if cycle_mode == CycleModes.LINEAR then
+  local result = scene_number
+  if cycle_mode == CycleModes.LINEAR or cycle_mode == CycleModes.LINEAR_REVERSING then
     if scene_number > scenes_count then
       result = scenes_count
     elseif scene_number < 1 then
@@ -291,10 +306,7 @@ local function dashboard_target_action(device, autocycle_was_running)
   elseif mode == DashboardMode.LOOPING_NEXT then
     return reached_end(device, 1) and Actions.FIRST or Actions.NEXT
   elseif mode == DashboardMode.SMART_REVERSE then
-    local direction = device:get_field(SMART_REVERSE_DIRECTION_FIELD) or 1
-    direction = reached_end(device, direction) and direction * -1 or direction
-    device:set_field(SMART_REVERSE_DIRECTION_FIELD, direction)
-    return direction < 0 and Actions.PREV or Actions.NEXT
+    return Actions.SMART_NEXT_PREV
   elseif mode == DashboardMode.SMART_AUTO then
     return autocycle_was_running and Actions.AUTOCYCLE_STOP or Actions.AUTOCYCLE_FORWARDS
   elseif mode == DashboardMode.SMART_AUTO_RANDOM then
@@ -315,7 +327,10 @@ end
 
 local function handle_activate_scene(driver, device, cmd)
   local autocycle_was_running = autocycle.running(device)
-  autocycle.stop(device) -- Stopping autocycle with any action is convenient
+
+  if autostop_on_any_action(device) then
+    autocycle.stop(device)
+  end
   
   local action = cmd.args.scene
   if side_effect_detected(device, action) then
@@ -334,6 +349,12 @@ local function handle_activate_scene(driver, device, cmd)
 
   if action == Actions.NEXT or action == Actions.PREV then
     local step = action == Actions.NEXT and 1 or -1
+    activate_scene(device, current_scene(device) + step)
+  elseif action == Actions.SMART_NEXT_PREV then
+    local direction = device:get_field(SMART_REVERSE_DIRECTION_FIELD) or 1
+    direction = reached_end(device, direction) and direction * -1 or direction
+    device:set_field(SMART_REVERSE_DIRECTION_FIELD, direction)
+    local step = direction < 0 and -1 or 1
     activate_scene(device, current_scene(device) + step)
   elseif action == Actions.SKIP_NEXT or action == Actions.SKIP_PREV then
     local step = action == Actions.SKIP_NEXT and 2 or -2
@@ -357,7 +378,8 @@ local function handle_activate_scene(driver, device, cmd)
     end
   elseif action == Actions.AUTOCYCLE_FORWARDS or action == Actions.AUTOCYCLE_BACKWARDS or action == Actions.AUTOCYCLE_RANDOM then
     if autocycle_was_running and device.preferences.autocycleStartStops then
-      return -- not starting the auto-cycle
+      autocycle.stop(device)
+      return
     end
     local random = action == Actions.AUTOCYCLE_RANDOM
     local step = random and 0 or (action == Actions.AUTOCYCLE_FORWARDS and 1 or -1)
@@ -388,6 +410,18 @@ local function handle_activate_scene(driver, device, cmd)
 end
 
 -- AUTO-CYCLE FEATURE
+
+local function autocycle_emit_started(device)
+  if active_scene.autocycle then
+    device:emit_component_event(device.profile.components.main, active_scene.autocycle({value = "started"}))
+  end
+end
+
+local function autocycle_emit_stopped(device)
+  if active_scene.autocycle then
+    device:emit_component_event(device.profile.components.main, active_scene.autocycle({value = "stopped"}))
+  end
+end
 
 local function autocycle_delay(device) 
   -- Mind that long auto-cycle settings (minutes) override the standard ones (millis) if non-zero
@@ -430,34 +464,45 @@ end
 autocycle.callback = function(device, step, switch_count, scene)
   return function()
     local target_scene
+    local updated_step = step
     if switch_count == -1 then
       -- First step has to be delayed too, do not activate now
       target_scene = step == 0 and random_scene(device) or scene
     else
       activate_scene(device, scene)
-      target_scene = step == 0 and random_scene(device) or current_scene(device) + step
+      if cycle_mode(device) == CycleModes.LINEAR_REVERSING then
+        if scene_out_of_bounds(device, current_scene(device) + updated_step) then
+          updated_step = updated_step * -1
+        end
+      end
+      target_scene = step == 0 and random_scene(device) or current_scene(device) + updated_step
     end
 
     local updated_switch_count = switch_count + 1    
-
+    
     -- Stop conditions
+    local stopped = false
     if updated_switch_count == 1 and device.preferences.autocycleSwitchOnce then
       log.debug("[Auto-cycle] Stopping after one switch")
-      autocycle.stop(device)
-      return
-    elseif updated_switch_count > 0 and reached_end(device, step) then
+      stopped = true
+    elseif updated_switch_count > 0 and reached_end(device, updated_step) then
       log.debug("[Auto-cycle] Stopping. Reached end after switching " .. updated_switch_count .. " scenes")
-      autocycle.stop(device)
-      return
+      stopped = true
     elseif updated_switch_count >= max_autocycle_switches(device) then
       log.debug("[Auto-cycle] Stopping. Completed loop through " .. updated_switch_count .. " scenes")
-      autocycle.stop(device)
-      return
+      stopped = true
     end
 
-    -- Prepare next switch
-    local delay = autocycle_delay(device)
-    autocycle_start_timer(device, delay, step, updated_switch_count, target_scene)
+    if stopped then
+      autocycle.stop(device)
+      autocycle_emit_stopped(device)
+    else
+      local delay = autocycle_delay(device)
+      autocycle_start_timer(device, delay, updated_step, updated_switch_count, target_scene)
+      if updated_switch_count <= 1 then
+        autocycle_emit_started(device)
+      end
+    end
   end
 end
 
@@ -485,6 +530,7 @@ autocycle.stop = function(device)
     device.thread:cancel_timer(timer)
     device:set_field(AUTOCYCLE_TIMER, nil)
     autocycle.delete_backup(device)
+    autocycle_emit_stopped(device)
   end
 end
 
@@ -518,6 +564,7 @@ end
 autocycle.restore = function(device)
   local serialized_backup = device:get_field(AUTOCYCLE_BACKUP_PERSISTENT_FIELD)
   if not serialized_backup then
+    autocycle_emit_stopped(device)
     return
   end
 
@@ -528,6 +575,7 @@ autocycle.restore = function(device)
     local number_value = tonumber(part)
     if not number_value then
       log.debug("[Auto-cycle] Wrong backup value")
+      autocycle_emit_stopped(device)
       return
     end
     table.insert(numbers, number_value)
@@ -535,6 +583,7 @@ autocycle.restore = function(device)
 
   if #numbers ~= 6 then
     log.debug("[Auto-cycle] Wrong backup format")
+    autocycle_emit_stopped(device)
     return
   end
 
@@ -550,11 +599,13 @@ autocycle.restore = function(device)
   local relaunch_delay = restored_delay - elapsed_seconds
   if elapsed_seconds < 0 or relaunch_delay < 0 then
     log.debug("[Auto-cycle] Backup out of time")
+    autocycle_emit_stopped(device)
     return
   end
 
   log.debug("[Auto-cycle] Timer restored. Switching scene in: " .. relaunch_delay .. " s")
   autocycle_start_timer(device, relaunch_delay, step, switch_count, target_scene)
+  autocycle_emit_started(device)
 end
 
 
