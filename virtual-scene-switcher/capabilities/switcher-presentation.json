@@ -2,7 +2,20 @@
     "dashboard": {
         "states": [
             {
-                "label": "{{scene.value}}"
+                "label": "| {{scene.value}} {{autocycle.value}}",
+                "value": "autocycle.value",
+                "alternatives": [
+                    {
+                        "key": "started",
+                        "value": "| auto-cycle",
+                        "type": "active"
+                    },
+                    {
+                        "key": "stopped",
+                        "value": "|",
+                        "type": "inactive"
+                    }
+                ]
             }
         ],
         "actions": [
@@ -17,10 +30,17 @@
     },
     "detailView": [
         {
-            "label": "Active scene",
+            "label": "Current",
             "displayType": "state",
             "state": {
                 "label": "{{scene.value}}"
+            }
+        },
+        {
+            "label": "Auto-cycle",
+            "displayType": "state",
+            "state": {
+                "label": "{{autocycle.value}}"
             }
         }
     ],
